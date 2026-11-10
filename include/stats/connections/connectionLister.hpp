@@ -1,0 +1,140 @@
+#pragma once
+#include <QMutex>
+#include <QWaitCondition>
+#include <QString>
+#include <QHash>
+#include <QSet>
+#include <QPair>
+#include <QList>
+#include <atomic>
+#include <functional>
+
+namespace Stats
+{
+    // The integer values are persisted in settings: append only, never insert mid-enum.
+    enum ConnectionSort
+    {
+        Default,
+        ByDownload,
+        ByUpload,
+        ByProcess,
+        ByTraffic, // total traffic = upload + download
+        ByOutbound,
+        ByProtocol,
+        ByDownloadSpeed,
+        ByUploadSpeed,
+        BySpeed, // total speed = uploadSpeed + downloadSpeed
+        BySource
+    };
+
+    // The core sends M.Socksaddr.String(): "1.2.3.4:5678" or "[fe80::1]:5678", so an unbracketed form must split at the last colon.
+    QString EndpointHost(const QString& endpoint);
+
+    // Unflipped sorts put the biggest number first but text A→Z, so `ascending` alone does not say which way rows run.
+    bool SortIsDescending(ConnectionSort sort, bool ascending);
+
+    class ConnectionMetadata
+    {
+        public:
+        QString id;
+        long long createdAtMs;
+        long long upload;
+        long long download;
+        QString outbound;     // the core's tag, e.g. route-0
+        QString outboundName; // the profile behind the tag, else the tag itself
+        QString network;
+        QString dest;
+        QString protocol;
+        QString domain;
+        QString process;     // basename, e.g. chrome.exe
+        QString processPath;
+        QString source;        // raw "ip:port" reported by the core, empty when unknown
+        QString sourceDisplay; // tr("Local") for this machine, else the client's bare IP
+        bool sourceLocal = false; // sourceDisplay is the tr("Local") label
+        QString rule;          // the matched route rule as sing-box prints it, empty when routed by final
+        QString ruleItem;      // the rule's entries that matched, e.g. "domain_suffix=github.com"; empty when the core could not tell
+        long long closedAtMs = 0; // 0 while live
+        long long uploadSpeed = 0;   // bytes/sec
+        long long downloadSpeed = 0;
+    };
+
+    class ConnectionLister
+    {
+    public:
+        std::atomic<bool> suspend{true};
+
+        void Loop();
+
+        // Only wakes the loop; the caller is the UI thread and must not block on the core's IPC.
+        void ForceUpdate();
+
+        // Selects the 1 Hz vs relaxed poll cadence; switching to visible wakes the loop at once.
+        void SetInView(bool inView);
+
+        // The Throne API's watch, independent of the window: polls at 1 Hz and feeds the API sink; switching on wakes the loop.
+        void SetApiWatch(bool watch);
+
+        // Open rows first, then the recently closed ones, each newest first; at most kSnapshotMaxRows. polledAtMs: epoch ms.
+        using ApiSink = std::function<void(const QList<ConnectionMetadata>& rows, qint64 polledAtMs)>;
+
+        // Main thread only; the polls hop to the main thread before calling it.
+        void SetApiSink(ApiSink sink);
+
+        static constexpr qsizetype kSnapshotMaxRows = 2000;
+
+        void stopLoop();
+
+        void setSort(ConnectionSort newSort);
+
+        // Restores a persisted pair as-is; setSort() would read the repeat as a direction flip.
+        void restoreSort(ConnectionSort newSort, bool ascending);
+
+        ConnectionSort getSort() const { return sort; }
+
+        bool isSortAscending() const { return asc; }
+
+        // Tag -> profile name of the running config; empty while stopped.
+        void SetOutboundNames(const QHash<QString, QString>& names);
+
+    private:
+        // Off-view polls still sample the traffic stats; only the sort and the pushes are skipped.
+        void update(bool pushToUi, bool pushToApi);
+
+        // Rebuilt from the active set on every poll, so it self-prunes.
+        struct SpeedSample
+        {
+            qint64 upload = 0;
+            qint64 download = 0;
+            qint64 sampledAtMs = 0;
+            qint64 upSpeed = 0;
+            qint64 downSpeed = 0;
+        };
+        QHash<QString, SpeedSample> speedSamples_;
+
+        QMutex mu;
+
+        // Interruptible poll sleep: SetInView(true), SetApiWatch(true), ForceUpdate() and stopLoop() wake it early.
+        QMutex waitMu_;
+        QWaitCondition waitCond_;
+        std::atomic<bool> inView_{false};
+        std::atomic<bool> apiWatch_{false};
+        bool forced_ = false; // guarded by waitMu_
+
+        std::atomic<bool> stop{false};
+
+        ConnectionSort sort = Default;
+
+        bool asc = false;
+
+        // The core's closed ring is non-draining, so closed ids must be deduped; both are rebuilt each poll.
+        QHash<QString, QPair<qint64, qint64>> lastBytes_;
+        QSet<QString> accountedClosed_;
+
+        QMutex namesMu_;
+        QHash<QString, QString> outboundNames_;
+
+        ApiSink apiSink_; // main thread only
+    };
+
+    extern ConnectionLister* connection_lister;
+}

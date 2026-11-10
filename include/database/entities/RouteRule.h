@@ -1,0 +1,201 @@
+#pragma once
+#include <QUrl>
+#include <QJsonObject>
+#include <QObject>
+#include <QSet>
+
+#include "include/global/Validation.hpp"
+
+namespace Configs {
+    struct RuleIssue {
+        Validation::Severity severity = Validation::Severity::Error;
+        QString attr;
+        QString message;
+        // The offending list item; empty when the message is about the attribute as a whole.
+        QString value;
+        // The other attribute of a cross-field problem.
+        QString related;
+    };
+
+    enum inputType {trufalse, select, text};
+
+    // -4 is reserved internally for dns hijack (see get_rule_json), so warp-bypass is -5.
+    enum outboundID {proxyID=-1, directID=-2, blockID=-3, warpBypassID=-5};
+    inline QString outboundIDToString(int id)
+    {
+        if (id == proxyID) return {"proxy"};
+        if (id == directID) return {"direct"};
+        if (id == blockID) return {"block"};
+        if (id == warpBypassID) return {"warp-bypass"};
+        return {"unknown"};
+    }
+    inline outboundID stringToOutboundID(const QString& out)
+    {
+        if (out == "proxy") return proxyID;
+        if (out == "direct") return directID;
+        if (out == "block") return blockID;
+        if (out == "warp-bypass") return warpBypassID;
+        return proxyID;
+    }
+
+    // New rule types MUST be appended: RouteRule::type is persisted as the raw int.
+    enum ruleType {custom, simpleAddressProxy, simpleAddressBypass, simpleAddressBlock, simpleProcessNameProxy, simpleProcessNameBypass, simpleProcessNameBlock, simpleProcessPathProxy, simpleProcessPathBypass, simpleProcessPathBlock, simpleAddressWarpBypass, simpleProcessNameWarpBypass, simpleProcessPathWarpBypass, endpointPreferredBy};
+
+    inline QString ruleTypeToString(ruleType type)
+    {
+        if (type == custom) return {"custom"};
+        if (type == simpleAddressProxy) return {"Simple Address Proxy"};
+        if (type == simpleAddressBypass) return {"Simple Address Bypass"};
+        if (type == simpleAddressBlock) return {"Simple Address Block"};
+        if (type == simpleProcessNameProxy) return {"Simple Process Name Proxy"};
+        if (type == simpleProcessNameBypass) return {"Simple Process Name Bypass"};
+        if (type == simpleProcessNameBlock) return {"Simple Process Name Block"};
+        if (type == simpleProcessPathProxy) return {"Simple Process Path Proxy"};
+        if (type == simpleProcessPathBypass) return {"Simple Process Path Bypass"};
+        if (type == simpleProcessPathBlock) return {"Simple Process Path Block"};
+        if (type == simpleAddressWarpBypass) return {"Simple Address Warp-bypass"};
+        if (type == simpleProcessNameWarpBypass) return {"Simple Process Name Warp-bypass"};
+        if (type == simpleProcessPathWarpBypass) return {"Simple Process Path Warp-bypass"};
+        if (type == endpointPreferredBy) return QObject::tr("Endpoint");
+        return {"invalid"};
+    }
+
+    // Share-schema tokens: must stay stable across enum reordering and UI relabelling.
+    inline QString ruleTypeToToken(int type)
+    {
+        switch (type) {
+            case simpleAddressProxy: return {"simple_address_proxy"};
+            case simpleAddressBypass: return {"simple_address_bypass"};
+            case simpleAddressBlock: return {"simple_address_block"};
+            case simpleProcessNameProxy: return {"simple_process_name_proxy"};
+            case simpleProcessNameBypass: return {"simple_process_name_bypass"};
+            case simpleProcessNameBlock: return {"simple_process_name_block"};
+            case simpleProcessPathProxy: return {"simple_process_path_proxy"};
+            case simpleProcessPathBypass: return {"simple_process_path_bypass"};
+            case simpleProcessPathBlock: return {"simple_process_path_block"};
+            case simpleAddressWarpBypass: return {"simple_address_warp_bypass"};
+            case simpleProcessNameWarpBypass: return {"simple_process_name_warp_bypass"};
+            case simpleProcessPathWarpBypass: return {"simple_process_path_warp_bypass"};
+            case endpointPreferredBy: return {"endpoint_preferred_by"};
+            default: return {"custom"};
+        }
+    }
+
+    inline ruleType tokenToRuleType(const QString& token)
+    {
+        if (token == "simple_address_proxy") return simpleAddressProxy;
+        if (token == "simple_address_bypass") return simpleAddressBypass;
+        if (token == "simple_address_block") return simpleAddressBlock;
+        if (token == "simple_process_name_proxy") return simpleProcessNameProxy;
+        if (token == "simple_process_name_bypass") return simpleProcessNameBypass;
+        if (token == "simple_process_name_block") return simpleProcessNameBlock;
+        if (token == "simple_process_path_proxy") return simpleProcessPathProxy;
+        if (token == "simple_process_path_bypass") return simpleProcessPathBypass;
+        if (token == "simple_process_path_block") return simpleProcessPathBlock;
+        if (token == "simple_address_warp_bypass") return simpleAddressWarpBypass;
+        if (token == "simple_process_name_warp_bypass") return simpleProcessNameWarpBypass;
+        if (token == "simple_process_path_warp_bypass") return simpleProcessPathWarpBypass;
+        if (token == "endpoint_preferred_by") return endpointPreferredBy;
+        return custom;
+    }
+
+    inline QString get_rule_set_name(QString ruleSet)
+    {
+        if (auto url = QUrl(ruleSet); url.isValid() && url.fileName().contains(".srs"))
+        {
+            return url.fileName().replace(".srs", "-srs") + "-" + QString::number(qHash(url.toEncoded()));
+        }
+        return ruleSet;
+    }
+
+    class RouteRule {
+    public:
+        RouteRule() = default;
+
+        RouteRule(const RouteRule& other);
+
+        QString name = "";
+        int type = custom;
+        // Kept in the profile but left out of the generated config.
+        bool disabled = false;
+        QString ip_version;
+        QString network;
+        QString protocol;
+        QList<QString> inbound;
+        QList<QString> domain;
+        QList<QString> domain_suffix;
+        QList<QString> domain_keyword;
+        QList<QString> domain_regex;
+        QList<QString> source_ip_cidr;
+        bool source_ip_is_private = false;
+        QList<QString> ip_cidr;
+        bool ip_is_private = false;
+        QList<QString> source_port;
+        QList<QString> source_port_range;
+        QList<QString> port;
+        QList<QString> port_range;
+        QList<QString> process_name;
+        QList<QString> process_path;
+        QList<QString> process_path_regex;
+        QList<QString> package_name;
+        QList<QString> wifi_ssid;
+        QList<QString> wifi_bssid;
+        QList<QString> rule_set;
+        bool invert = false;
+        int outboundID = directID; // -1 is proxy -2 is direct -3 is block -4 is dns_out
+        // since sing-box 1.11.0
+        QString action = "route";
+
+        QString rejectMethod;
+        bool no_drop = false;
+
+        QString override_address;
+        QString override_port;
+        // since sing-box 1.12.0
+        bool tls_fragment = false;
+        QString tls_fragment_fallback_delay;
+        bool tls_record_fragment = false;
+        // since sing-box 1.14.0
+        QString tls_spoof;
+        QString tls_spoof_method;
+        // TODO maybe add some of dial fields?
+
+        QStringList sniffers;
+        bool sniffOverrideDest = false;
+
+        QString strategy;
+
+        QSet<QString> uiVisibleAttributes;
+        bool uiAttributeTabsSeeded = false;
+        QString uiActiveAttributeTabLabel;
+
+        [[nodiscard]] QJsonObject get_rule_json(bool forView = false, const QString& outboundTag = "");
+        [[nodiscard]] QJsonObject to_share_json();
+        static QStringList get_attributes();
+        static QStringList tab_attributes();
+        [[nodiscard]] static bool is_attribute_at_default(const RouteRule& rule, const QString& attr);
+        void clear_attribute_value(const QString& attr);
+        void ensure_ui_visible_attribute_tabs_seeded();
+        static inputType get_input_type(const QString& fieldName);
+        static QStringList get_values_for_field(const QString& fieldName);
+        [[nodiscard]] QStringList get_current_value_string(const QString& fieldName) const;
+        [[nodiscard]] QString get_current_value_bool(const QString& fieldName) const;
+        void set_field_value(const QString& fieldName, const QStringList& value);
+        [[nodiscard]] bool isEmpty();
+        bool canEditAttr(const QString &attr);
+
+        [[nodiscard]] static bool is_list_attribute(const QString& attr);
+        [[nodiscard]] static bool is_match_attribute(const QString& attr);
+        // The actions get_rule_json emits attr for; empty when it applies to every action.
+        [[nodiscard]] static QStringList action_scope(const QString& attr);
+        // The action get_rule_json emits: a route rule to block or dns_out is a reject or hijack-dns rule.
+        [[nodiscard]] QString effective_action() const;
+        [[nodiscard]] bool has_match_conditions() const;
+        // One list item or scalar value of attr, on its own; the outbound and cross-field rules are validate()'s.
+        [[nodiscard]] static RuleIssue check_value(const QString& attr, const QString& value);
+        // Every problem the core would refuse at start, or that leaves the rule not doing what it says.
+        [[nodiscard]] QList<RuleIssue> validate() const;
+        // The (attr, related, severity) shapes validate() reports cross-field problems in.
+        [[nodiscard]] static QList<RuleIssue> cross_checks();
+    };
+} // namespace Configs

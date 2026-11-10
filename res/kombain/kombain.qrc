@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/kombain">
+        <file>font/onest_regular.ttf</file>
+        <file>font/onest_medium.ttf</file>
+        <file>font/onest_bold.ttf</file>
+        <file>app.png</file>
+        <file>check.svg</file>
+    </qresource>
+    <qresource prefix="/qss">
+        <file alias="kombain.css">qss/kombain.css</file>
+        <file alias="kombainlight.css">qss/kombainlight.css</file>
+    </qresource>
+</RCC>

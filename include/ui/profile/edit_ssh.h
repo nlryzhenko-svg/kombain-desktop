@@ -1,0 +1,33 @@
+#pragma once
+
+#include <QPointer>
+#include <QWidget>
+#include "profile_editor.h"
+#include "ui_edit_ssh.h"
+
+QT_BEGIN_NAMESPACE
+namespace Ui {
+    class EditSSH;
+}
+QT_END_NAMESPACE
+
+class EditSSH : public QWidget, public ProfileEditor {
+    Q_OBJECT
+
+public:
+    explicit EditSSH(QWidget *parent = nullptr);
+    ~EditSSH() override;
+
+    void onStart(std::shared_ptr<Configs::Profile> _ent) override;
+
+    bool onEnd() override;
+
+    void bindValidation(Validation::Form &form) override;
+
+    bool serverPortOptional() override;
+
+private:
+    Ui::EditSSH *ui;
+    std::shared_ptr<Configs::Profile> ent;
+    QPointer<Validation::Form> form;
+};
