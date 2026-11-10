@@ -30,6 +30,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPlainTextEdit>
@@ -94,7 +96,7 @@ namespace Kombain {
         o["password"] = protect(password); o["key"] = protect(key);
         o["sni"] = sni; o["hostKey"] = hostKey; o["sshPort"] = sshPort; o["role"] = role; o["exitId"] = exitId;
         o["protocols"] = protocols; o["vpnPort"] = vpnPort; o["xhPort"] = xhPort; o["hyPort"] = hyPort;
-        o["tuicPort"] = tuicPort; o["groupId"] = groupId; o["stats"] = stats; o["statsAt"] = statsAt;
+        o["tuicPort"] = tuicPort; o["tgPort"] = tgPort; o["groupId"] = groupId; o["stats"] = stats; o["statsAt"] = statsAt;
         o["health"] = health;
         return o;
     }
@@ -107,6 +109,7 @@ namespace Kombain {
         n.sshPort = o["sshPort"].toInt(22); n.role = o["role"].toString("single"); n.exitId = o["exitId"].toString();
         n.protocols = o["protocols"].toString("vless,hy2"); n.vpnPort = o["vpnPort"].toInt(443);
         n.xhPort = o["xhPort"].toInt(8443); n.hyPort = o["hyPort"].toInt(443); n.tuicPort = o["tuicPort"].toInt(8443);
+        n.tgPort = o["tgPort"].toInt(9443);
         n.groupId = o["groupId"].toInt(-1); n.stats = o["stats"].toString();
         n.statsAt = o["statsAt"].toVariant().toLongLong(); n.health = o["health"].toString();
         return n;
@@ -156,6 +159,7 @@ namespace Kombain {
             else if (p == "xhttp") out << "XHTTP";
             else if (p == "hy2") out << "Hysteria2";
             else if (p == "tuic") out << "TUIC";
+            else if (p == "tg") out << "Telegram";
             else out << p;
         }
         return out.join(" + ");
@@ -325,6 +329,121 @@ namespace Kombain {
         dlg.exec();
     }
 
+    void ShowTelegram(QWidget *parent, const QString &serverName, const QString &tgLink) {
+        const QString web = QString(tgLink).replace("tg://proxy", "https://t.me/proxy");
+        QDialog dlg(parent);
+        dlg.setWindowTitle("Прокси для Telegram · " + serverName);
+        auto *lay = new QVBoxLayout(&dlg);
+        auto *hint = new QLabel("Telegram подключается к этому прокси сам — VPN включать не нужно.\n"
+                                "На компьютере нажмите «Открыть в Telegram», на телефоне отсканируйте QR-код камерой.\n"
+                                "Ссылка одна на всех.");
+        hint->setProperty("kombainMuted", true);
+        hint->setWordWrap(true);
+        lay->addWidget(hint);
+        auto *img = new QLabel;
+        img->setAlignment(Qt::AlignCenter);
+        img->setPixmap(qrPixmap(web, 300));
+        lay->addWidget(img);
+        auto *text = new QPlainTextEdit(web);
+        text->setReadOnly(true);
+        text->setMaximumHeight(60);
+        lay->addWidget(text);
+        auto *row = new QHBoxLayout;
+        auto *open = new QPushButton("Открыть в Telegram");
+        open->setProperty("kombainPrimary", true);
+        auto *copy = new QPushButton("Копировать ссылку");
+        QObject::connect(open, &QPushButton::clicked, &dlg, [&dlg, tgLink, web, open] {
+            if (!QDesktopServices::openUrl(QUrl(tgLink))) {
+                QGuiApplication::clipboard()->setText(web);
+                QMessageBox::information(&dlg, "Kombain", "Telegram Desktop не найден — ссылка скопирована. Откройте её в любом Telegram.");
+            } else {
+                open->setText("Открыто ✓");
+            }
+        });
+        QObject::connect(copy, &QPushButton::clicked, &dlg, [web, copy] {
+            QGuiApplication::clipboard()->setText(web);
+            copy->setText("Скопировано ✓");
+        });
+        auto *close = new QPushButton("Готово");
+        QObject::connect(close, &QPushButton::clicked, &dlg, &QDialog::accept);
+        row->addWidget(open);
+        row->addWidget(copy);
+        row->addStretch();
+        row->addWidget(close);
+        lay->addLayout(row);
+        dlg.resize(460, 560);
+        dlg.exec();
+    }
+
+    // ------------------------------------------------------------------ connect existing
+
+    class ConnectDialog : public QDialog {
+    public:
+        QLineEdit *name, *host, *user, *pass;
+        QSpinBox *port;
+        QPlainTextEdit *key;
+        ServerNode node;
+
+        explicit ConnectDialog(QWidget *parent) : QDialog(parent) {
+            setWindowTitle("Подключить существующий сервер");
+            auto *lay = new QVBoxLayout(this);
+            auto *hint = new QLabel("Сервер, где Kombain уже стоит — например, поднятый с телефона. Ничего не переустанавливается: "
+                                    "Kombain только заберёт ссылки и добавит сервер в список. Ключи не меняются, телефон и другие "
+                                    "устройства продолжат работать.");
+            hint->setWordWrap(true);
+            hint->setProperty("kombainMuted", true);
+            lay->addWidget(hint);
+            auto *box = new QFrame;
+            box->setProperty("kombainCard", true);
+            auto *grid = new QFormLayout(box);
+            name = new QLineEdit;
+            name->setPlaceholderText("Необязательно — возьмём с сервера");
+            host = new QLineEdit;
+            host->setPlaceholderText("IP или домен VPS");
+            port = new QSpinBox;
+            port->setRange(1, 65535);
+            port->setValue(22);
+            user = new QLineEdit("root");
+            pass = new QLineEdit;
+            pass->setEchoMode(QLineEdit::Password);
+            key = new QPlainTextEdit;
+            key->setPlaceholderText("Ключ SSH (если входите по ключу)");
+            key->setMaximumHeight(60);
+            grid->addRow("Название", name);
+            auto *hostRow = new QHBoxLayout;
+            hostRow->addWidget(host, 1);
+            hostRow->addWidget(new QLabel("SSH-порт"));
+            hostRow->addWidget(port);
+            grid->addRow("Адрес", hostRow);
+            auto *authRow = new QHBoxLayout;
+            authRow->addWidget(user);
+            authRow->addWidget(new QLabel("Пароль"));
+            authRow->addWidget(pass, 1);
+            grid->addRow("Логин", authRow);
+            grid->addRow("Ключ", key);
+            lay->addWidget(box);
+            auto *buttons = new QDialogButtonBox;
+            auto *go = buttons->addButton("Подключить", QDialogButtonBox::AcceptRole);
+            go->setDefault(true);
+            buttons->addButton("Отмена", QDialogButtonBox::RejectRole);
+            connect(buttons, &QDialogButtonBox::accepted, this, [this] {
+                node.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+                node.name = name->text().trimmed().remove('|');
+                node.host = host->text().trimmed();
+                node.sshPort = port->value();
+                node.user = user->text().trimmed().isEmpty() ? "root" : user->text().trimmed();
+                node.password = pass->text();
+                node.key = key->toPlainText().trimmed();
+                if (node.host.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите IP-адрес сервера"); host->setFocus(); return; }
+                if (node.password.isEmpty() && node.key.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите пароль или ключ SSH"); pass->setFocus(); return; }
+                accept();
+            });
+            connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+            lay->addWidget(buttons);
+            resize(560, 380);
+        }
+    };
+
     // ------------------------------------------------------------------ wizard
 
     class ServerWizard : public QDialog {
@@ -338,8 +457,8 @@ namespace Kombain {
         };
         Form mainForm{}, entryForm{};
         QRadioButton *single, *cascade;
-        QCheckBox *pVless, *pXhttp, *pHy2, *pTuic;
-        QSpinBox *portVless, *portXhttp, *portHy, *portTuic;
+        QCheckBox *pVless, *pXhttp, *pHy2, *pTuic, *pTg;
+        QSpinBox *portVless, *portXhttp, *portHy, *portTuic, *portTg;
         QLabel *modeHint;
 
         static QSpinBox *portBox(int v) {
@@ -426,18 +545,23 @@ namespace Kombain {
             pXhttp = new QCheckBox("VLESS + XHTTP + Reality — держится, когда режут обычный Reality");
             pHy2 = new QCheckBox("Hysteria2 — быстрый на плохих сетях (UDP)");
             pTuic = new QCheckBox("TUIC v5 — запасной вариант на QUIC (UDP)");
-            pVless->setChecked(true); pXhttp->setChecked(true); pHy2->setChecked(true);
-            for (auto *c: {pVless, pXhttp, pHy2, pTuic}) pl->addWidget(c);
+            pTg = new QCheckBox("Прокси для Telegram — Telegram работает и без VPN (MTProto, маскировка под сайт)");
+            pVless->setChecked(true); pXhttp->setChecked(true); pHy2->setChecked(true); pTg->setChecked(true);
+            for (auto *c: {pVless, pXhttp, pHy2, pTuic, pTg}) pl->addWidget(c);
             auto *ports = new QGridLayout;
             portVless = portBox(443); portXhttp = portBox(8443); portHy = portBox(443); portTuic = portBox(8443);
             ports->addWidget(new QLabel("Порт VLESS (TCP)"), 0, 0); ports->addWidget(portVless, 0, 1);
             ports->addWidget(new QLabel("Порт Hysteria2 (UDP)"), 0, 2); ports->addWidget(portHy, 0, 3);
             ports->addWidget(new QLabel("Порт XHTTP (TCP)"), 1, 0); ports->addWidget(portXhttp, 1, 1);
             ports->addWidget(new QLabel("Порт TUIC (UDP)"), 1, 2); ports->addWidget(portTuic, 1, 3);
+            portTg = portBox(9443);
+            auto *tgLabel = new QLabel("Порт Telegram (TCP)");
+            ports->addWidget(tgLabel, 2, 0); ports->addWidget(portTg, 2, 1);
+            connect(pTg, &QCheckBox::toggled, this, [tgLabel, this](bool on) { tgLabel->setVisible(on); portTg->setVisible(on); });
             pl->addLayout(ports);
             lay->addWidget(protoBox);
 
-            auto *note = new QLabel("Kombain зайдёт на сервер по SSH, скачает Xray, Hysteria2 и (для TUIC) sing-box с GitHub, "
+            auto *note = new QLabel("Kombain зайдёт на сервер по SSH, скачает Xray, Hysteria2, sing-box (для TUIC) и mtg (для Telegram) с GitHub, "
                                     "создаст ключи, откроет порты и запустит службы. Нужен VPS с Debian или Ubuntu. "
                                     "Пароль хранится на компьютере в зашифрованном виде.");
             note->setWordWrap(true);
@@ -494,15 +618,18 @@ namespace Kombain {
             if (n.sni.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите сайт для маскировки"); return false; }
             n.protocols = protocols();
             n.vpnPort = portVless->value(); n.xhPort = portXhttp->value(); n.hyPort = portHy->value(); n.tuicPort = portTuic->value();
+            n.tgPort = portTg->value();
             return true;
         }
 
         ServerNode mainNode, entryNode;
 
         void tryAccept() {
-            if (protocols().isEmpty()) { QMessageBox::warning(this, "Kombain", "Выберите хотя бы один протокол"); return; }
+            if (protocols().isEmpty()) { QMessageBox::warning(this, "Kombain", "Выберите хотя бы один VPN-протокол"); return; }
+            const bool tg = pTg->isChecked();
             if ((pXhttp->isChecked() && portXhttp->value() == portVless->value()) ||
-                (pTuic->isChecked() && pHy2->isChecked() && portTuic->value() == portHy->value())) {
+                (pTuic->isChecked() && pHy2->isChecked() && portTuic->value() == portHy->value()) ||
+                (tg && (portTg->value() == portVless->value() || (pXhttp->isChecked() && portTg->value() == portXhttp->value())))) {
                 QMessageBox::warning(this, "Kombain", "Порты одного типа (TCP или UDP) должны различаться");
                 return;
             }
@@ -511,6 +638,10 @@ namespace Kombain {
                 if (!readNode(entryForm, "Вход", entryNode)) return;
                 // the bridge between nodes always uses VLESS Reality
                 if (!mainNode.protocols.contains("vless")) mainNode.protocols = "vless," + mainNode.protocols;
+                // Telegram connects to the entry node (in Russia), it forwards to the exit
+                if (tg) entryNode.protocols += ",tg";
+            } else if (tg) {
+                mainNode.protocols += ",tg";
             }
             accept();
         }
@@ -522,7 +653,22 @@ namespace Kombain {
         return QStringList{"install", "--host", n.host.trimmed(), "--protocols", n.protocols, "--sni", n.sni,
                            "--port", QString::number(n.vpnPort), "--hy-port", QString::number(n.hyPort),
                            "--xh-port", QString::number(n.xhPort), "--tuic-port", QString::number(n.tuicPort),
-                           "--name", n.name} + extra;
+                           "--tg-port", QString::number(n.tgPort), "--name", n.name} + extra;
+    }
+
+    /** Keeps the stored node in step with what the server reports (protocols, ports). */
+    static void syncInfo(ServerNode &n, const QJsonObject &result) {
+        const auto i = result["info"].toObject();
+        if (i.isEmpty()) return;
+        if (!i["protocols"].toString().isEmpty()) n.protocols = i["protocols"].toString();
+        if (!i["sni"].toString().isEmpty()) n.sni = i["sni"].toString();
+        n.vpnPort = i["port"].toInt(n.vpnPort); n.xhPort = i["xhPort"].toInt(n.xhPort);
+        n.hyPort = i["hyPort"].toInt(n.hyPort); n.tuicPort = i["tuicPort"].toInt(n.tuicPort);
+        n.tgPort = i["tgPort"].toInt(n.tgPort);
+    }
+
+    static QString tgNote(const QJsonObject &result) {
+        return result["telegram"].toString().isEmpty() ? QString() : QString(" Прокси для Telegram — в «Пользователи».");
     }
 
     MyServersDialog::MyServersDialog(QWidget *parent) : QDialog(parent) {
@@ -541,13 +687,16 @@ namespace Kombain {
         auto *ht = new QLabel("Свой VPN-сервер");
         ht->setStyleSheet("font-size: 20px; font-weight: 700;");
         auto *hs = new QLabel("Нужен только VPS с Debian или Ubuntu и доступ по SSH. Kombain сам поставит VLESS Reality, XHTTP, "
-                              "Hysteria2 и TUIC, настроит и добавит профили. Свой домен не нужен.");
+                              "Hysteria2, TUIC и прокси для Telegram, настроит и добавит профили. Свой домен не нужен.");
         hs->setWordWrap(true);
         auto *newBtn = new QPushButton("Поднять сервер");
         newBtn->setStyleSheet("QPushButton { background: #F1FFF9; color: #0E8F69; border: none; border-radius: 12px; padding: 10px; font-weight: 700; }");
+        auto *connectBtn = new QPushButton("Подключить существующий");
+        connectBtn->setStyleSheet("QPushButton { background: transparent; color: #F1FFF9; border: 1px solid #F1FFF9; border-radius: 12px; padding: 9px; font-weight: 600; }");
         hl->addWidget(ht);
         hl->addWidget(hs);
         hl->addWidget(newBtn);
+        hl->addWidget(connectBtn);
         lay->addWidget(hero);
 
         logCard = new QFrame;
@@ -593,6 +742,12 @@ namespace Kombain {
             if (w.exec() != QDialog::Accepted) return;
             if (w.cascade->isChecked()) installCascade(w.mainNode, w.entryNode);
             else installSingle(w.mainNode);
+        });
+        connect(connectBtn, &QPushButton::clicked, this, [this] {
+            if (running) { QMessageBox::information(this, "Kombain", "Дождитесь окончания текущей операции"); return; }
+            ConnectDialog d(this);
+            if (d.exec() != QDialog::Accepted) return;
+            connectExisting(d.node);
         });
         connect(copyLog, &QToolButton::clicked, this, [this] { QGuiApplication::clipboard()->setText(logView->toPlainText()); });
         reloadList();
@@ -667,9 +822,10 @@ namespace Kombain {
         runOn(node, installArgs(node), [this](NodeRun *r, bool ok) {
             auto n = r->node;
             if (!ok) return endTask(false, r->error.isEmpty() ? "Установка не удалась" : r->error);
+            syncInfo(n, r->result);
             importLinks(n, n.name, r->result);
             ServerStore::upsert(n);
-            endTask(true, QString("Готово: профили добавлены в группу «%1».").arg(n.name));
+            endTask(true, QString("Готово: профили добавлены в группу «%1».").arg(n.name) + tgNote(r->result));
         });
     }
 
@@ -688,10 +844,11 @@ namespace Kombain {
             runOn(entryNode, installArgs(entryNode, {"--role", "entry", "--exit-link", bridge}), [this, exitN](NodeRun *r2, bool ok2) {
                 if (!ok2) return endTask(false, r2->error.isEmpty() ? "Входной сервер не установился" : r2->error);
                 auto en = r2->node;
+                syncInfo(en, r2->result);
                 const auto group = en.name + " → " + exitN.name;
                 importLinks(en, group, r2->result);
                 ServerStore::upsert(en);
-                endTask(true, QString("Готово: профили в группе «%1».").arg(group));
+                endTask(true, QString("Готово: профили в группе «%1».").arg(group) + tgNote(r2->result));
             });
         });
     }
@@ -701,6 +858,7 @@ namespace Kombain {
         runOn(s, {"links"}, [this](NodeRun *r, bool ok) {
             if (!ok) return endTask(false, r->error.isEmpty() ? "Не удалось получить ссылки" : r->error);
             auto n = r->node;
+            syncInfo(n, r->result);
             QString group = n.name;
             if (n.role == "entry") {
                 bool found = false;
@@ -710,6 +868,81 @@ namespace Kombain {
             importLinks(n, group, r->result);
             ServerStore::upsert(n);
             endTask(true, "Профили обновлены.");
+        });
+    }
+
+    void MyServersDialog::connectExisting(ServerNode node) {
+        beginTask("Подключаю " + node.host);
+        runOn(node, {"links"}, [this](NodeRun *r, bool ok) {
+            if (!ok) return endTask(false, r->error.isEmpty() ? "На сервере не найден Kombain" : r->error);
+            auto n = r->node;
+            // the same server added twice: update its card
+            for (const auto &old: ServerStore::all()) {
+                if (old.host.trimmed() == n.host.trimmed() && old.id != n.id) {
+                    n.id = old.id; n.groupId = old.groupId; n.exitId = old.exitId;
+                    break;
+                }
+            }
+            syncInfo(n, r->result);
+            if (n.name.isEmpty()) n.name = r->result["info"].toObject()["name"].toString(n.host);
+            if (n.name.isEmpty()) n.name = n.host;
+            n.role = r->result["role"].toString() == "entry" ? "entry"
+                   : !r->result["bridge"].toString().isEmpty() ? "exit" : "single";
+            if (n.role != "exit") importLinks(n, n.name, r->result);
+            ServerStore::upsert(n);
+            const auto result = r->result;
+            logLine("• Проверяю состояние");
+            runOn(n, {"stats"}, [this, result](NodeRun *r2, bool ok2) {
+                auto n2 = r2->node;
+                if (ok2 && !r2->stats.isEmpty()) {
+                    n2.stats = QString::fromUtf8(QJsonDocument(r2->stats).toJson(QJsonDocument::Compact));
+                    n2.statsAt = QDateTime::currentSecsSinceEpoch();
+                    n2.health = healthProblem(r2->stats);
+                    ServerStore::upsert(n2);
+                    for (const auto &v: r2->stats["services"].toArray()) {
+                        const auto o = v.toObject();
+                        logLine(QString("• %1: %2").arg(o["name"].toString(), o["state"].toString() == "active" ? "работает" : o["state"].toString()));
+                    }
+                }
+                endTask(true, n2.role == "exit" ? QString("Выходной сервер каскада добавлен. Профили берутся с входного сервера.")
+                                                : QString("Сервер добавлен, профили — в группе «%1».").arg(n2.name) + tgNote(result));
+            });
+        });
+    }
+
+    void MyServersDialog::enableTelegram(const ServerNode &s) {
+        bool okInput = false;
+        const int port = QInputDialog::getInt(this, "Включить прокси для Telegram",
+            QString("На сервер встанет MTProto-прокси (mtg) с маскировкой под %1.\n"
+                    "Telegram подключается к нему напрямую, без VPN.\n\nПорт (TCP):").arg(s.sni.isEmpty() ? "www.microsoft.com" : s.sni),
+            s.tgPort, 1, 65535, 1, &okInput);
+        if (!okInput) return;
+        if (port == s.vpnPort || (s.protocols.contains("xhttp") && port == s.xhPort)) {
+            QMessageBox::warning(this, "Kombain", "Этот порт уже занят VLESS или XHTTP — выберите другой.");
+            return;
+        }
+        beginTask("Прокси для Telegram на " + s.name);
+        runOn(s, {"enable-telegram", "--tg-port", QString::number(port)}, [this](NodeRun *r, bool ok) {
+            const auto link = r->result["telegram"].toString();
+            if (!ok || link.isEmpty()) return endTask(false, r->error.isEmpty() ? "Не удалось включить прокси" : r->error);
+            auto n = r->node;
+            syncInfo(n, r->result);
+            ServerStore::upsert(n);
+            endTask(true, "Прокси для Telegram работает.");
+            ShowTelegram(this, n.name, link);
+        });
+    }
+
+    void MyServersDialog::disableTelegram(const ServerNode &s) {
+        if (QMessageBox::question(this, "Выключить прокси для Telegram",
+                QString("Прокси для Telegram на «%1» будет остановлен, его ссылка перестанет работать.").arg(s.name)) != QMessageBox::Yes) return;
+        beginTask("Выключаю прокси для Telegram на " + s.name);
+        runOn(s, {"disable-telegram"}, [this](NodeRun *r, bool ok) {
+            if (!ok) return endTask(false, r->error.isEmpty() ? "Не удалось выключить" : r->error);
+            auto n = r->node;
+            syncInfo(n, r->result);
+            ServerStore::upsert(n);
+            endTask(true, "Прокси для Telegram выключен.");
         });
     }
 
@@ -820,11 +1053,29 @@ namespace Kombain {
                 }
                 lay->addWidget(row);
             }
+            const auto tgLink = result["telegram"].toString();
+            if (!tgLink.isEmpty()) {
+                auto *row = new QFrame;
+                row->setProperty("kombainCard", true);
+                auto *rl = new QHBoxLayout(row);
+                auto *texts = new QVBoxLayout;
+                auto *nm = new QLabel("Прокси для Telegram");
+                nm->setStyleSheet("font-weight: 600; font-size: 14px;");
+                auto *sub = new QLabel("Одна ссылка для всех — Telegram работает без VPN");
+                sub->setProperty("kombainMuted", true);
+                texts->addWidget(nm);
+                texts->addWidget(sub);
+                rl->addLayout(texts, 1);
+                auto *open = new QPushButton("Подключить");
+                connect(open, &QPushButton::clicked, &dlg, [this, &dlg, node, tgLink] { dlg.accept(); ShowTelegram(this, node.name, tgLink); });
+                rl->addWidget(open);
+                lay->addWidget(row);
+            }
             auto *add = new QPushButton("Добавить пользователя");
             add->setProperty("kombainPrimary", true);
             connect(add, &QPushButton::clicked, &dlg, [this, &dlg, node] { dlg.accept(); addUser(node); });
             lay->addWidget(add);
-            dlg.resize(480, 120 + 70 * users.size());
+            dlg.resize(480, 120 + 70 * (users.size() + (tgLink.isEmpty() ? 0 : 1)));
             dlg.exec();
         });
     }
@@ -837,11 +1088,12 @@ namespace Kombain {
             auto *form = new QFormLayout(&dlg);
             form->addRow(new QLabel("Новые порты (и заодно новые ключи).\nЕсли провайдер режет конкретный порт — смените его."));
             auto mk = [](int v) { auto *b = new QSpinBox; b->setRange(1, 65535); b->setValue(v); return b; };
-            auto *pv = mk(s.vpnPort), *px = mk(s.xhPort), *ph = mk(s.hyPort), *pt = mk(s.tuicPort);
+            auto *pv = mk(s.vpnPort), *px = mk(s.xhPort), *ph = mk(s.hyPort), *pt = mk(s.tuicPort), *pg = mk(s.tgPort);
             form->addRow("VLESS (TCP)", pv);
             if (s.protocols.contains("xhttp")) form->addRow("XHTTP (TCP)", px);
             if (s.protocols.contains("hy2")) form->addRow("Hysteria2 (UDP)", ph);
             if (s.protocols.contains("tuic")) form->addRow("TUIC (UDP)", pt);
+            if (s.hasTelegram()) form->addRow("Telegram (TCP)", pg);
             auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
             bb->button(QDialogButtonBox::Ok)->setText("Сменить");
             connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
@@ -852,6 +1104,7 @@ namespace Kombain {
             if (s.protocols.contains("xhttp")) args << "--xh-port" << QString::number(px->value());
             if (s.protocols.contains("hy2")) args << "--hy-port" << QString::number(ph->value());
             if (s.protocols.contains("tuic")) args << "--tuic-port" << QString::number(pt->value());
+            if (s.hasTelegram()) args << "--tg-port" << QString::number(pg->value());
         } else if (QMessageBox::question(this, "Сменить ключи",
                        "Сервер получит новые ключи Reality, пароли и пути. Старые ссылки у всех пользователей перестанут работать — "
                        "профили на этом компьютере обновятся сами, остальным нужно будет отправить новые QR-коды.\n\n"
@@ -868,7 +1121,9 @@ namespace Kombain {
                 else if (args[i] == "--xh-port") n.xhPort = v;
                 else if (args[i] == "--hy-port") n.hyPort = v;
                 else if (args[i] == "--tuic-port") n.tuicPort = v;
+                else if (args[i] == "--tg-port") n.tgPort = v;
             }
+            syncInfo(n, r->result);
             ServerStore::upsert(n);
             if (n.role == "exit") {
                 const auto bridge = r->result["bridge"].toString();
@@ -891,7 +1146,8 @@ namespace Kombain {
             }
             importLinks(n, group, r->result);
             ServerStore::upsert(n);
-            endTask(true, "Ключи заменены, профили обновлены. Другим пользователям отправьте новые QR-коды.");
+            endTask(true, QString("Ключи заменены, профили обновлены. Другим пользователям отправьте новые QR-коды.") +
+                          (r->result["telegram"].toString().isEmpty() ? "" : " Ссылка Telegram-прокси тоже новая."));
         });
     }
 
@@ -957,6 +1213,11 @@ namespace Kombain {
         btn("Проверить", [this, node] { checkServer(node); });
         auto *more = new QPushButton("Ещё");
         auto *menu = new QMenu(more);
+        if (s.role != "exit") {
+            if (s.hasTelegram()) menu->addAction("Выключить прокси для Telegram", this, [this, node] { if (!running) disableTelegram(node); });
+            else menu->addAction("Включить прокси для Telegram", this, [this, node] { if (!running) enableTelegram(node); });
+            menu->addSeparator();
+        }
         menu->addAction("Сменить ключи", this, [this, node] { if (!running) rotate(node, false); });
         menu->addAction("Сменить порты и ключи", this, [this, node] { if (!running) rotate(node, true); });
         menu->addSeparator();

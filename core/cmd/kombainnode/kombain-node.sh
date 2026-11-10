@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# Kombain node installer — VLESS+Reality, VLESS+XHTTP+Reality (Xray), Hysteria2 and TUIC v5
-# on Debian/Ubuntu. No domain needed.
+# Kombain node installer — VLESS+Reality, VLESS+XHTTP+Reality (Xray), Hysteria2, TUIC v5
+# and a Telegram MTProto proxy (mtg, FakeTLS) on Debian/Ubuntu. No domain needed.
 #
 #   kombain-node.sh install  --host IP [--role single|entry] [--protocols vless,xhttp,hy2,tuic]
 #                            [--sni www.microsoft.com] [--port 443] [--xh-port 8443] [--hy-port 443]
-#                            [--tuic-port 8443] [--name "Мой сервер"] [--user "Телефон"]
+#                            [--tuic-port 8443] [--tg-port 9443] [--name "Мой сервер"] [--user "Телефон"]
 #                            [--bridge] [--exit-link vless://...]
 #   kombain-node.sh add-user NAME | remove-user NAME
 #   kombain-node.sh links
 #   kombain-node.sh status            (human readable)
 #   kombain-node.sh stats             (KB_STATS <base64 JSON> for the app)
-#   kombain-node.sh rotate [--port N] [--xh-port N] [--hy-port N] [--tuic-port N] [--sni HOST]
+#   kombain-node.sh rotate [--port N] [--xh-port N] [--hy-port N] [--tuic-port N] [--tg-port N] [--sni HOST]
 #                          new Reality keys, paths, passwords and user ids (old links stop working)
 #   kombain-node.sh set-exit --exit-link vless://...   (entry node: point to a new exit)
+#   kombain-node.sh enable-telegram [--tg-port N] | disable-telegram
 #   kombain-node.sh uninstall
 #
+# Protocols: vless, xhttp, hy2, tuic, tg (Telegram proxy: one tg:// link for everybody).
 # Roles:
 #   single — standalone node: clients exit to the internet from here.
 #   entry  — first hop of a cascade: clients connect here, traffic leaves through the
@@ -24,7 +26,8 @@
 # Output protocol (parsed by the Kombain app):
 #   KB_STEP <text>     progress line
 #   KB_ERROR <text>    fatal error
-#   KB_RESULT <base64 JSON>  {"links":[{"user":..,"proto":..,"link":..}], "bridge": "vless://..."}
+#   KB_RESULT <base64 JSON>  {"links":[{"user":..,"proto":..,"link":..}], "bridge": "vless://...",
+#                             "telegram": "tg://proxy?...", "info": {name, protocols, sni, ports}}
 #   KB_STATS  <base64 JSON>  see cmd_stats
 set -euo pipefail
 
@@ -40,6 +43,7 @@ KB_API_PORT=${KB_API_PORT:-10085}      # Xray stats API (localhost only)
 XRAY_URL_BASE=${XRAY_URL_BASE:-https://github.com/XTLS/Xray-core/releases/latest/download}
 HY_URL_BASE=${HY_URL_BASE:-https://github.com/apernet/hysteria/releases/latest/download}
 SB_REPO=${SB_REPO:-https://github.com/SagerNet/sing-box}
+MTG_REPO=${MTG_REPO:-https://github.com/9seconds/mtg}
 
 step() { echo "KB_STEP $*"; }
 die() { echo "KB_ERROR $*"; exit 1; }
@@ -57,12 +61,13 @@ load_state() {
   # shellcheck disable=SC1090
   . "$(state_file)"
   XH_PORT=${XH_PORT:-8443}; TUIC_PORT=${TUIC_PORT:-8443}; XH_PATH=${XH_PATH:-/$(rand_hex 6)}
+  TG_PORT=${TG_PORT:-9443}; TG_SECRET=${TG_SECRET:-}
 }
 
 save_state() {
   mkdir -p "$KB_DIR"; chmod 700 "$KB_DIR"
   {
-    for v in ROLE HOST PROTOCOLS SNI PORT XH_PORT XH_PATH HY_PORT TUIC_PORT NAME PRIV PUB SID HY_OBFS BRIDGE_UUID \
+    for v in ROLE HOST PROTOCOLS SNI PORT XH_PORT XH_PATH HY_PORT TUIC_PORT TG_PORT TG_SECRET NAME PRIV PUB SID HY_OBFS BRIDGE_UUID \
              EXIT_ADDR EXIT_PORT EXIT_UUID EXIT_FLOW EXIT_SNI EXIT_PBK EXIT_SID EXIT_FP; do
       printf "%s=%q\n" "$v" "${!v-}"
     done
@@ -76,14 +81,16 @@ urlenc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv
   || printf '%s' "$1" | od -An -tx1 | tr -d ' \n' | sed 's/../%&/g'; }
 
 rand_hex() { openssl rand -hex "$1"; }
+hex_str() { printf '%s' "$1" | od -An -tx1 | tr -d ' \n'; }
+json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 # ---------------------------------------------------------------------------- install deps
 
 detect_arch() {
   case "$(uname -m)" in
-    x86_64|amd64) XRAY_ARCH=64; HY_ARCH=amd64; SB_ARCH=amd64 ;;
-    aarch64|arm64) XRAY_ARCH=arm64-v8a; HY_ARCH=arm64; SB_ARCH=arm64 ;;
-    armv7l) XRAY_ARCH=arm32-v7a; HY_ARCH=arm; SB_ARCH=armv7 ;;
+    x86_64|amd64) XRAY_ARCH=64; HY_ARCH=amd64; SB_ARCH=amd64; MTG_ARCH=amd64 ;;
+    aarch64|arm64) XRAY_ARCH=arm64-v8a; HY_ARCH=arm64; SB_ARCH=arm64; MTG_ARCH=arm64 ;;
+    armv7l) XRAY_ARCH=arm32-v7a; HY_ARCH=arm; SB_ARCH=armv7; MTG_ARCH=armv7 ;;
     *) die "неподдерживаемая архитектура $(uname -m)" ;;
   esac
 }
@@ -129,6 +136,30 @@ download_binaries() {
     install -m 755 "$tmp/sing-box-$ver-linux-$SB_ARCH/sing-box" "$KB_BIN/kombain-singbox"
   fi
   rm -rf "$tmp"
+  if has_proto tg; then download_mtg; fi
+  return 0
+}
+
+latest_tag() { # repo url -> vX.Y.Z (the releases/latest redirect, then the API)
+  local repo=$1 tag
+  tag=$(curl -fsSI "$repo/releases/latest" 2>/dev/null | awk -F/ 'tolower($0) ~ /^location:/ {print $NF}' | tr -d '\r' || true)
+  [ -n "$tag" ] || tag=$(curl -fsSL "https://api.github.com/repos/${repo#https://github.com/}/releases/latest" 2>/dev/null \
+    | grep -o '"tag_name": *"[^"]*"' | head -1 | grep -o 'v[^"]*' || true)
+  echo "$tag"
+}
+
+download_mtg() {
+  [ "$KB_DOWNLOAD" = 1 ] || return 0
+  [ -x "$KB_BIN/kombain-mtg" ] && return 0
+  detect_arch
+  step "Скачиваю mtg (прокси для Telegram)"
+  local tmp tag ver; tmp=$(mktemp -d)
+  tag=$(latest_tag "$MTG_REPO"); ver=${tag#v}
+  [ -n "$ver" ] || die "не удалось узнать версию mtg"
+  curl -fsSL --retry 3 -o "$tmp/mtg.tgz" "$MTG_REPO/releases/download/$tag/mtg-$ver-linux-$MTG_ARCH.tar.gz" || die "не удалось скачать mtg"
+  tar -xzf "$tmp/mtg.tgz" -C "$tmp"
+  install -m 755 "$tmp/mtg-$ver-linux-$MTG_ARCH/mtg" "$KB_BIN/kombain-mtg"
+  rm -rf "$tmp"
 }
 
 # ---------------------------------------------------------------------------- configs
@@ -142,7 +173,11 @@ gen_keys() {
   SID=$(rand_hex 8)
   HY_OBFS=$(rand_hex 16)
   XH_PATH=/$(rand_hex 6)
+  new_tg_secret
 }
+
+# FakeTLS secret: "ee" + 16 random bytes + the masking domain (Telegram sends it as SNI)
+new_tg_secret() { TG_SECRET=ee$(rand_hex 16)$(hex_str "$SNI"); }
 
 new_user_line() { # name -> "name|uuid|hypass"
   printf '%s|%s|%s\n' "$1" "$("$KB_BIN/kombain-xray" uuid)" "$(rand_hex 16)"
@@ -188,7 +223,7 @@ render_xray() {
     xh_in=$(printf ',{"tag":"xhttp-in","listen":"0.0.0.0","port":%s,"protocol":"vless","settings":{"clients":[%s],"decryption":"none"},"streamSettings":{"network":"xhttp","xhttpSettings":{"path":"%s","mode":"auto"},%s},%s}' \
       "$XH_PORT" "$(json_clients "")" "$XH_PATH" "$reality" "$sniff")
   fi
-  if has_proto hy2 || has_proto tuic; then
+  if has_proto hy2 || has_proto tuic || has_proto tg; then
     socks_in=',{"tag":"hy-in","listen":"127.0.0.1","port":'"$KB_SOCKS_PORT"',"protocol":"socks","settings":{"udp":true}}'
   fi
   if [ "$ROLE" = entry ]; then
@@ -288,6 +323,26 @@ render_hysteria() {
   chmod 600 "$KB_DIR/hysteria.yaml"
 }
 
+render_mtg() {
+  has_proto tg || { rm -f "$KB_DIR/mtg.toml"; return 0; }
+  [ -n "$TG_SECRET" ] || new_tg_secret
+  # on a cascade entry node Telegram traffic goes through Xray to the exit node
+  local proxies=""
+  [ "$ROLE" = entry ] && proxies="\"socks5://127.0.0.1:$KB_SOCKS_PORT\""
+  cat > "$KB_DIR/mtg.toml" <<EOF
+secret = "$TG_SECRET"
+bind-to = "0.0.0.0:$TG_PORT"
+prefer-ip = "prefer-ipv4"
+
+[network]
+proxies = [$proxies]
+
+[defense.blocklist]
+enabled = false
+EOF
+  chmod 600 "$KB_DIR/mtg.toml"
+}
+
 # ---------------------------------------------------------------------------- services
 
 write_units() {
@@ -333,12 +388,26 @@ LimitNOFILE=1048576
 WantedBy=multi-user.target
 EOF
   fi
+  if has_proto tg; then
+    cat > /etc/systemd/system/kombain-mtg.service <<EOF
+[Unit]
+Description=Kombain Telegram proxy (mtg)
+After=network-online.target kombain-xray.service
+[Service]
+ExecStart=$KB_BIN/kombain-mtg run $KB_DIR/mtg.toml
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
   systemctl daemon-reload
 }
 
-svc_list() { echo "xray"; has_proto hy2 && echo hysteria; has_proto tuic && echo tuic; return 0; }
+svc_list() { echo "xray"; has_proto hy2 && echo hysteria; has_proto tuic && echo tuic; has_proto tg && echo mtg; return 0; }
 
-svc_title() { case $1 in xray) echo Xray ;; hysteria) echo Hysteria2 ;; tuic) echo TUIC ;; esac; }
+svc_title() { case $1 in xray) echo Xray ;; hysteria) echo Hysteria2 ;; tuic) echo TUIC ;; mtg) echo Telegram ;; esac; }
 
 restart_services() {
   [ "$KB_SYSTEMD" = 1 ] || return 0
@@ -353,7 +422,7 @@ restart_services() {
     systemctl is-active --quiet "kombain-$s" || die "$(svc_title "$s") не запустился: $(journalctl -u "kombain-$s" -n 5 --no-pager | tail -3 | tr '\n' ' ')"
   done
   # services of protocols that were switched off
-  for s in hysteria tuic; do
+  for s in hysteria tuic mtg; do
     svc_list | grep -qx "$s" || systemctl disable --now "kombain-$s" >/dev/null 2>&1 || true
   done
   return 0
@@ -367,12 +436,14 @@ open_firewall() {
     has_proto xhttp && ufw allow "$XH_PORT/tcp" >/dev/null
     has_proto hy2 && ufw allow "$HY_PORT/udp" >/dev/null
     has_proto tuic && ufw allow "$TUIC_PORT/udp" >/dev/null
+    has_proto tg && ufw allow "$TG_PORT/tcp" >/dev/null
   elif command -v firewall-cmd >/dev/null && firewall-cmd --state >/dev/null 2>&1; then
     step "Открываю порты в firewalld"
     firewall-cmd -q --permanent --add-port="$PORT/tcp"
     has_proto xhttp && firewall-cmd -q --permanent --add-port="$XH_PORT/tcp"
     has_proto hy2 && firewall-cmd -q --permanent --add-port="$HY_PORT/udp"
     has_proto tuic && firewall-cmd -q --permanent --add-port="$TUIC_PORT/udp"
+    has_proto tg && firewall-cmd -q --permanent --add-port="$TG_PORT/tcp"
     firewall-cmd -q --reload
   fi
   return 0
@@ -427,17 +498,31 @@ print_result() {
   if [ -n "${BRIDGE_UUID-}" ]; then
     bridge="vless://$BRIDGE_UUID@$h:$PORT?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$SNI&fp=chrome&pbk=$PUB&sid=$SID&type=tcp#bridge"
   fi
-  local json; json=$(printf '{"role":"%s","links":[%s],"bridge":"%s"}' "$ROLE" "$links" "$bridge")
+  local tg=""
+  if has_proto tg && [ -n "$TG_SECRET" ]; then tg="tg://proxy?server=$HOST&port=$TG_PORT&secret=$TG_SECRET"; fi
+  local info; info=$(printf '{"name":"%s","protocols":"%s","sni":"%s","port":%s,"xhPort":%s,"hyPort":%s,"tuicPort":%s,"tgPort":%s}' \
+    "$(json_str "$NAME")" "$PROTOCOLS" "$SNI" "$PORT" "$XH_PORT" "$HY_PORT" "$TUIC_PORT" "$TG_PORT")
+  local json; json=$(printf '{"role":"%s","links":[%s],"bridge":"%s","telegram":"%s","info":%s}' "$ROLE" "$links" "$bridge" "$tg" "$info")
   echo "KB_RESULT $(printf '%s' "$json" | base64 | tr -d '\n')"
 }
 
 # ---------------------------------------------------------------------------- commands
 
-render_all() { render_xray; render_hysteria; render_tuic; write_units; }
+render_all() { render_xray; render_hysteria; render_tuic; render_mtg; write_units; }
+
+check_ports() {
+  [ "$PORT" != "$XH_PORT" ] || ! has_proto xhttp || die "порты VLESS и XHTTP должны различаться"
+  [ "$HY_PORT" != "$TUIC_PORT" ] || ! has_proto tuic || ! has_proto hy2 || die "порты Hysteria2 и TUIC должны различаться"
+  if has_proto tg; then
+    [ "$TG_PORT" != "$PORT" ] || die "порты VLESS и Telegram должны различаться"
+    [ "$TG_PORT" != "$XH_PORT" ] || ! has_proto xhttp || die "порты XHTTP и Telegram должны различаться"
+  fi
+  return 0
+}
 
 cmd_install() {
   ROLE=single; HOST=""; PROTOCOLS="vless,xhttp,hy2"; SNI="www.microsoft.com"; PORT=443; HY_PORT=443
-  XH_PORT=8443; TUIC_PORT=8443
+  XH_PORT=8443; TUIC_PORT=8443; TG_PORT=9443; TG_SECRET=""
   NAME="Kombain"; local first_user="Телефон" bridge=0 exit_link=""
   while [ $# -gt 0 ]; do
     case $1 in
@@ -449,6 +534,7 @@ cmd_install() {
       --xh-port) XH_PORT=$2; shift 2 ;;
       --hy-port) HY_PORT=$2; shift 2 ;;
       --tuic-port) TUIC_PORT=$2; shift 2 ;;
+      --tg-port) TG_PORT=$2; shift 2 ;;
       --name) NAME=$2; shift 2 ;;
       --user) first_user=$2; shift 2 ;;
       --bridge) bridge=1; shift ;;
@@ -458,8 +544,7 @@ cmd_install() {
   done
   [ -n "$HOST" ] || die "не указан --host"
   [ "$ROLE" = single ] || [ "$ROLE" = entry ] || die "роль должна быть single или entry"
-  [ "$PORT" != "$XH_PORT" ] || ! has_proto xhttp || die "порты VLESS и XHTTP должны различаться"
-  [ "$HY_PORT" != "$TUIC_PORT" ] || ! has_proto tuic || ! has_proto hy2 || die "порты Hysteria2 и TUIC должны различаться"
+  check_ports
   [ "$KB_SYSTEMD" = 1 ] && need_root
   if [ "$ROLE" = entry ]; then
     [ -n "$exit_link" ] || die "для входной ноды нужна --exit-link"
@@ -514,8 +599,6 @@ cmd_status() {
   return 0
 }
 
-json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
-
 cmd_stats() {
   load_state
   local up load mem_total mem_avail disk iface rx=0 tx=0 svcs="" first=1 s st
@@ -560,10 +643,12 @@ cmd_rotate() {
       --xh-port) XH_PORT=$2; shift 2 ;;
       --hy-port) HY_PORT=$2; shift 2 ;;
       --tuic-port) TUIC_PORT=$2; shift 2 ;;
+      --tg-port) TG_PORT=$2; shift 2 ;;
       --sni) SNI=$2; shift 2 ;;
       *) die "неизвестный параметр $1" ;;
     esac
   done
+  check_ports
   gen_keys
   [ -n "${BRIDGE_UUID-}" ] && BRIDGE_UUID=$("$KB_BIN/kombain-xray" uuid)
   step "Выдаю пользователям новые ключи"
@@ -590,15 +675,45 @@ cmd_set_exit() {
   print_result
 }
 
+cmd_enable_telegram() {
+  load_state
+  [ "$KB_SYSTEMD" = 1 ] && need_root
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --tg-port) TG_PORT=$2; shift 2 ;;
+      *) die "неизвестный параметр $1" ;;
+    esac
+  done
+  has_proto tg || PROTOCOLS="$PROTOCOLS,tg"
+  check_ports
+  download_mtg
+  [ -n "$TG_SECRET" ] || new_tg_secret
+  save_state
+  step "Настраиваю прокси для Telegram"
+  render_all; open_firewall; restart_services
+  step "Прокси для Telegram включён"
+  print_result
+}
+
+cmd_disable_telegram() {
+  load_state
+  [ "$KB_SYSTEMD" = 1 ] && need_root
+  PROTOCOLS=$(echo ",$PROTOCOLS," | sed 's/,tg,/,/g; s/^,//; s/,$//')
+  save_state
+  render_all; restart_services
+  step "Прокси для Telegram выключен"
+  print_result
+}
+
 cmd_uninstall() {
   [ "$KB_SYSTEMD" = 1 ] && need_root
   if [ "$KB_SYSTEMD" = 1 ]; then
-    systemctl disable --now kombain-xray kombain-hysteria kombain-tuic >/dev/null 2>&1 || true
+    systemctl disable --now kombain-xray kombain-hysteria kombain-tuic kombain-mtg >/dev/null 2>&1 || true
     rm -f /etc/systemd/system/kombain-xray.service /etc/systemd/system/kombain-hysteria.service \
-      /etc/systemd/system/kombain-tuic.service /etc/sysctl.d/99-kombain.conf
+      /etc/systemd/system/kombain-tuic.service /etc/systemd/system/kombain-mtg.service /etc/sysctl.d/99-kombain.conf
     systemctl daemon-reload
   fi
-  rm -rf "$KB_DIR" "$KB_SHARE" "$KB_BIN/kombain-xray" "$KB_BIN/kombain-hysteria" "$KB_BIN/kombain-singbox"
+  rm -rf "$KB_DIR" "$KB_SHARE" "$KB_BIN/kombain-xray" "$KB_BIN/kombain-hysteria" "$KB_BIN/kombain-singbox" "$KB_BIN/kombain-mtg"
   step "Kombain удалён с сервера"
 }
 
@@ -611,6 +726,8 @@ case ${1-} in
   stats) cmd_stats ;;
   rotate) shift; cmd_rotate "$@" ;;
   set-exit) shift; cmd_set_exit "$@" ;;
+  enable-telegram) shift; cmd_enable_telegram "$@" ;;
+  disable-telegram) cmd_disable_telegram ;;
   uninstall) cmd_uninstall ;;
-  *) die "команды: install | add-user NAME | remove-user NAME | links | status | stats | rotate | set-exit | uninstall" ;;
+  *) die "команды: install | add-user NAME | remove-user NAME | links | status | stats | rotate | set-exit | enable-telegram | disable-telegram | uninstall" ;;
 esac

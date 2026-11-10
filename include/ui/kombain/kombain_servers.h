@@ -23,7 +23,7 @@ namespace Kombain {
         QString role = "single"; // single | entry | exit
         QString exitId;
         QString protocols = "vless,xhttp,hy2";
-        int vpnPort = 443, xhPort = 8443, hyPort = 443, tuicPort = 8443;
+        int vpnPort = 443, xhPort = 8443, hyPort = 443, tuicPort = 8443, tgPort = 9443;
         int groupId = -1;
         QString stats; // last `stats` JSON
         qint64 statsAt = 0;
@@ -31,6 +31,7 @@ namespace Kombain {
 
         QJsonObject toJson() const;
         static ServerNode fromJson(const QJsonObject &o);
+        bool hasTelegram() const { return protocols.split(',').contains("tg"); }
     };
 
     class ServerStore {
@@ -79,6 +80,7 @@ namespace Kombain {
         void runOn(const ServerNode &node, const QStringList &args, const std::function<void(NodeRun *, bool)> &done);
         void installSingle(ServerNode node);
         void installCascade(ServerNode exitNode, ServerNode entryNode);
+        void connectExisting(ServerNode node);
         void reloadList();
 
     private:
@@ -96,10 +98,13 @@ namespace Kombain {
         void addUser(const ServerNode &s);
         void rotate(const ServerNode &s, bool askPorts);
         void uninstall(const ServerNode &s);
+        void enableTelegram(const ServerNode &s);
+        void disableTelegram(const ServerNode &s);
         void importLinks(ServerNode &node, const QString &groupName, const QJsonObject &result, bool firstUserOnly = true);
     };
 
     void ShowUserLinks(QWidget *parent, const QString &title, const QList<QPair<QString, QString>> &protoLinks);
+    void ShowTelegram(QWidget *parent, const QString &serverName, const QString &tgLink);
 
     QString InstallArgsProtocolsLabel(const QString &protocols);
 }
