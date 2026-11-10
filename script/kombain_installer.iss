@@ -2,6 +2,13 @@
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
+; numeric X.Y.Z for the file version resource ("1.0.0-dev.5" -> "1.0.0")
+#define DashPos Pos("-", AppVersion)
+#if DashPos > 0
+  #define NumVersion Copy(AppVersion, 1, DashPos - 1)
+#else
+  #define NumVersion AppVersion
+#endif
 
 [Setup]
 AppId={{6B1E4C2A-7D3F-4A58-9C61-2E8B0F4D7A11}
@@ -9,7 +16,7 @@ AppName=Kombain
 AppVersion={#AppVersion}
 AppVerName=Kombain {#AppVersion}
 AppPublisher=Kombain
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#NumVersion}
 VersionInfoProductName=Kombain
 VersionInfoDescription=Kombain Setup
 SourceDir=..
