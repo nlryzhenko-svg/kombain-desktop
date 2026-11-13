@@ -1,5 +1,6 @@
 // Kombain «Мои серверы» for the desktop app. The server side is the same kombain-node.sh the phone uses;
 // SSH is done by the bundled kombain-node helper (Go), so this file only drives it and shows the results.
+#include <QRegularExpression>
 #include "include/ui/kombain/kombain_servers.h"
 
 #include "3rdparty/qrcodegen.hpp"
@@ -796,7 +797,11 @@ namespace Kombain {
             if (firstUserOnly && o["user"].toString() != firstUser) continue;
             // Sudoku is a phone-only protocol for now: the desktop core does not carry it
             if (o["link"].toString().startsWith("sudoku://")) { skippedSudoku = true; continue; }
-            text << o["link"].toString();
+            QString link = o["link"].toString();
+            // Hysteria2 port hopping is left to the phone, which checks the ports of each network; the desktop
+            // uses the main port, which the server always listens on
+            if (link.startsWith("hysteria2://")) link.remove(QRegularExpression("&mport=[0-9,:-]+"));
+            text << link;
         }
         if (skippedSudoku) logLine("  (профиль Sudoku пропущен — на компьютере он пока не поддерживается)");
         if (text.isEmpty()) return;
