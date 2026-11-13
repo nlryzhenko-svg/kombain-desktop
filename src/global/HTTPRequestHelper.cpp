@@ -1,3 +1,5 @@
+#include <QCryptographicHash>
+#include <QSslCertificate>
 #include "include/global/HTTPRequestHelper.hpp"
 
 #include <QNetworkProxy>
@@ -90,13 +92,29 @@ namespace Configs_network {
         request.setAttribute(QNetworkRequest::Http2AllowedAttribute, options.http2);
         request.setHeader(QNetworkRequest::KnownHeaders::UserAgentHeader,
                           options.userAgent.isEmpty() ? Configs::dataManager->settingsRepo->GetUserAgent() : options.userAgent);
-        const bool insecure = Configs::dataManager->settingsRepo->net_insecure && !options.strictTls;
+        // Kombain: an own server serves its subscription with a self-signed certificate whose SHA-256 is pinned
+        // in the link (#kbpin=<64 hex>). Such a request trusts exactly that certificate and nothing else.
+        QByteArray kbPin;
+        for (const auto &part: QUrl(url).fragment().split('&')) {
+            if (part.startsWith("kbpin=") && part.size() == 6 + 64) kbPin = part.mid(6).toLatin1().toLower();
+        }
+        bool kbPinMismatch = false;
+        const bool insecure = !kbPin.isEmpty() || (Configs::dataManager->settingsRepo->net_insecure && !options.strictTls);
         auto ssl = request.sslConfiguration();
         ssl.setProtocol(options.tlsProtocol);
         if (insecure) ssl.setPeerVerifyMode(QSslSocket::PeerVerifyMode::VerifyNone);
         request.setSslConfiguration(ssl);
         for (const auto &[name, value] : options.headers) request.setRawHeader(name, value);
         auto _reply = accessManager.get(request);
+        if (!kbPin.isEmpty()) {
+            connect(_reply, &QNetworkReply::encrypted, _reply, [_reply, kbPin, &kbPinMismatch] {
+                const auto cert = _reply->sslConfiguration().peerCertificate();
+                if (cert.isNull() || cert.digest(QCryptographicHash::Sha256).toHex() != kbPin) {
+                    kbPinMismatch = true;
+                    _reply->abort();
+                }
+            });
+        }
         connect(_reply, &QNetworkReply::sslErrors, _reply, [insecure](const QList<QSslError> &errors) {
             QStringList error_str;
             for (const auto &err: errors) {
@@ -125,7 +143,9 @@ namespace Configs_network {
 
         HTTPResponse result;
         result.header = _reply->rawHeaderPairs();
-        if (tooLarge) {
+        if (kbPinMismatch) {
+            result.error = QStringLiteral("Сертификат сервера подписки не совпал с закреплённым в ссылке — возьмите свежую ссылку в Kombain на телефоне");
+        } else if (tooLarge) {
             result.error = QObject::tr("Response larger than %1 MB").arg(maxBytes / (1024 * 1024));
         } else {
             result.error = _reply->error() == QNetworkReply::NetworkError::NoError ? "" : _reply->errorString();

@@ -789,12 +789,16 @@ namespace Kombain {
         const auto links = result["links"].toArray();
         QString firstUser;
         QStringList text;
+        bool skippedSudoku = false;
         for (const auto &v: links) {
             const auto o = v.toObject();
             if (firstUser.isEmpty()) firstUser = o["user"].toString();
             if (firstUserOnly && o["user"].toString() != firstUser) continue;
+            // Sudoku is a phone-only protocol for now: the desktop core does not carry it
+            if (o["link"].toString().startsWith("sudoku://")) { skippedSudoku = true; continue; }
             text << o["link"].toString();
         }
+        if (skippedSudoku) logLine("  (профиль Sudoku пропущен — на компьютере он пока не поддерживается)");
         if (text.isEmpty()) return;
         // replace the previous group of this server
         if (node.groupId >= 0 && Configs::dataManager->groupsRepo->GetGroup(node.groupId)) {
