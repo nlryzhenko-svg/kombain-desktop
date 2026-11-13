@@ -2,6 +2,7 @@
 # Kombain node installer — VLESS+Reality, VLESS+XHTTP+Reality (Xray), Hysteria2, TUIC v5
 # and a Telegram MTProto proxy (mtg, FakeTLS) on Debian/Ubuntu. No domain needed.
 #
+#   kombain-node.sh enable-bridge          (a Russian entry for this working single server, keys untouched)
 #   kombain-node.sh install  --host IP [--role single|entry] [--protocols vless,xhttp,hy2,tuic]
 #                            [--sni www.microsoft.com] [--port 443] [--xh-port 8443] [--hy-port 443]
 #                            [--tuic-port 8443] [--tg-port 9443] [--sd-port 8880] [--name "Мой сервер"] [--user "Телефон"]
@@ -1326,6 +1327,33 @@ cmd_shuffle_ports() {
   print_result
 }
 
+# A Russian entry node for an already working single server: only a bridge user is added to its VLESS
+# Reality; users, keys, ports and the server's own profiles stay as they are.
+cmd_enable_bridge() {
+  load_state
+  [ "$KB_SYSTEMD" = 1 ] && need_root
+  [ "$ROLE" = single ] || die "вход в России можно добавить только к одиночному серверу"
+  has_proto vless || die "серверы связываются через VLESS Reality, а он на этом сервере выключен"
+  if [ -z "${BRIDGE_UUID-}" ]; then
+    BRIDGE_UUID=$("$KB_BIN/kombain-xray" uuid)
+    step "Добавляю связь для входного сервера — ключи и пользователи не меняются"
+  else
+    step "Связь для входного сервера уже есть"
+  fi
+  if [ "${AUTO_PORTS:-0}" != 0 ]; then
+    AUTO_PORTS=0; ports_timer 0
+    step "Автосмена портов выключена: входной сервер должен знать порт этого"
+  fi
+  save_state
+  render_xray; render_sub
+  if [ "$KB_SYSTEMD" = 1 ]; then
+    systemctl restart kombain-xray
+    sleep 2
+    systemctl is-active --quiet kombain-xray || die "Xray не запустился: $(journalctl -u kombain-xray -n 5 --no-pager | tail -3 | tr '\n' ' ')"
+  fi
+  print_result
+}
+
 cmd_auto_ports() {
   load_state
   [ "$KB_SYSTEMD" = 1 ] && need_root
@@ -1545,6 +1573,7 @@ case ${1-} in
   ensure-sub) cmd_ensure_sub ;;
   shuffle-ports) shift; cmd_shuffle_ports "$@" ;;
   auto-ports) shift; cmd_auto_ports "$@" ;;
+  enable-bridge) shift; cmd_enable_bridge "$@" ;;
   harden) shift; cmd_harden "$@" ;;
   export) cmd_export ;;
   import) shift; cmd_import "$@" ;;
