@@ -88,7 +88,7 @@ load_state() {
   . "$(state_file)"
   XH_PORT=${XH_PORT:-8443}; TUIC_PORT=${TUIC_PORT:-8443}; XH_PATH=${XH_PATH:-/$(rand_hex 6)}
   TG_PORT=${TG_PORT:-9443}; TG_SECRET=${TG_SECRET:-}; DEST=${DEST:-}; SUB_PORT=${SUB_PORT:-}; AUTO_PORTS=${AUTO_PORTS:-0}
-  FP=${FP:-firefox}; ANTIFREEZE=${ANTIFREEZE:-0}; XH_DEC=${XH_DEC:-}; XH_ENC=${XH_ENC:-}
+  FP=$(fp_fix "${FP:-firefox}"); ANTIFREEZE=${ANTIFREEZE:-0}; XH_DEC=${XH_DEC:-}; XH_ENC=${XH_ENC:-}
   SNI_ROT=${SNI_ROT:-0}; SNI_ALTS=${SNI_ALTS:-}; HY_HOP=${HY_HOP:-}
   SD_PORT=${SD_PORT:-8880}; SD_PUB=${SD_PUB:-}; SD_MPRIV=${SD_MPRIV:-}
 }
@@ -253,7 +253,17 @@ gen_keys() {
   return 0
 }
 
-FPS="firefox edge chrome safari ios android 360 qq random randomized"
+# uTLS fingerprints the current REALITY accepts (it needs the post-quantum key share: the old Edge, iOS,
+# Android, 360 and QQ profiles don't send one and the server rejects them as "authentication failed")
+FPS="firefox chrome safari"
+fp_fix() { # any fingerprint -> the working one closest to it
+  case $1 in
+    firefox|chrome|safari) echo "$1" ;;
+    edge|360|qq|android) echo chrome ;;
+    ios) echo safari ;;
+    *) echo firefox ;;
+  esac
+}
 
 # VLESS Encryption key pair (X25519 authentication) for the XHTTP inbound
 gen_vlessenc() {
@@ -346,7 +356,7 @@ parse_exit_link() { # vless://uuid@host:port?query#name
   EXIT_PORT=${rest##*:}; EXIT_ADDR=${rest%:*}; EXIT_ADDR=${EXIT_ADDR#[}; EXIT_ADDR=${EXIT_ADDR%]}
   getq() { echo "$q" | tr '&' '\n' | awk -F= -v k="$1" '$1==k {print $2; exit}'; }
   EXIT_FLOW=$(getq flow); EXIT_SNI=$(getq sni); EXIT_PBK=$(getq pbk); EXIT_SID=$(getq sid); EXIT_FP=$(getq fp)
-  EXIT_FP=${EXIT_FP:-chrome}
+  EXIT_FP=$(fp_fix "${EXIT_FP:-chrome}")
   [ -n "$EXIT_UUID" ] && [ -n "$EXIT_PBK" ] && [ -n "$EXIT_SNI" ] || die "в ссылке выходной ноды не хватает данных Reality"
 }
 
@@ -918,7 +928,7 @@ cmd_install() {
     esac
   done
   [ -n "$HOST" ] || die "не указан --host"
-  case " $FPS " in *" $FP "*) ;; *) die "неизвестный отпечаток $FP" ;; esac
+  FP=$(fp_fix "$FP")
   [ "$ROLE" = single ] || [ "$ROLE" = entry ] || die "роль должна быть single или entry"
   check_ports
   [ "$KB_SYSTEMD" = 1 ] && need_root
@@ -1396,7 +1406,8 @@ cmd_harden() {
     step "Маскировка: $SNI"
   fi
   if [ -n "$fp" ]; then
-    case " $FPS " in *" $fp "*) FP=$fp ;; *) die "неизвестный отпечаток $fp (есть: $FPS)" ;; esac
+    FP=$(fp_fix "$fp")
+    [ "$FP" = "$fp" ] || step "Отпечаток $fp текущий Reality не принимает — ставлю $FP"
   fi
   if [ -n "$af" ]; then
     ANTIFREEZE=$(onoff "$af")
