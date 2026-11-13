@@ -376,7 +376,7 @@ json_clients() { # $1 = flow ("" for XHTTP)
 }
 
 render_xray() {
-  local ru_rules="" outbound_main="direct" extra_out="" socks_in="" xh_in="" vless_in="" freedom_settings=""
+  local ru_rules="" outbound_main="direct" extra_out="" socks_in="" xh_in="" vless_in="" freedom_settings="" strategy="IPIfNonMatch"
   [ "$KB_TEST" = 1 ] && freedom_settings=', "settings": {"finalRules": [{"action": "allow"}]}'
   local names="\"$SNI\"" a
   for a in ${SNI_ALTS//,/ }; do names+=",\"$a\""; done
@@ -403,6 +403,10 @@ render_xray() {
     if [ -f "$KB_SHARE/geosite.dat" ]; then
       ru_rules='{"type":"field","domain":["geosite:category-ru"],"outboundTag":"direct"},{"type":"field","ip":["geoip:ru"],"outboundTag":"direct"},'
     fi
+    # A site name is never resolved here to pick the route: the Russian DNS answers blocked sites with a
+    # stub in Russia, and YouTube video with Google caches inside Russian networks — both would match
+    # geoip:ru and go direct (blocked / throttled). Names go by the list, only bare IPs by geoip.
+    strategy="AsIs"
   fi
   cat > "$KB_DIR/xray.json" <<EOF
 {
@@ -413,7 +417,7 @@ render_xray() {
              "system": {"statsInboundUplink": true, "statsInboundDownlink": true}},
   "inbounds": [$vless_in$xh_in$socks_in],
   "outbounds": [{"tag": "direct", "protocol": "freedom"$freedom_settings}, {"tag": "block", "protocol": "blackhole"}$extra_out],
-  "routing": {"domainStrategy": "IPIfNonMatch", "rules": [
+  "routing": {"domainStrategy": "$strategy", "rules": [
     ${ru_rules}
     {"type": "field", "ip": ["geoip:private"], "outboundTag": "block"},
     {"type": "field", "network": "tcp,udp", "outboundTag": "$outbound_main"}
@@ -1019,6 +1023,19 @@ cmd_stats() {
     [ $ufirst = 1 ] || users+=","; ufirst=0
     users+=$(printf '{"name":"%s","up":%s,"down":%s}' "$(json_str "$name")" "${u:-0}" "${d:-0}")
   done < "$(users_file)"
+  # entry node: does traffic really leave through the exit server?
+  local exit_ip="" own_ip=""
+  if [ "$ROLE" = entry ]; then
+    if grep -q '"IPIfNonMatch"' "$KB_DIR/xray.json" 2>/dev/null; then
+      step "Исправляю маршрутизацию: заблокированные сайты шли напрямую из-за подмены DNS"
+      render_xray
+      if [ "$KB_SYSTEMD" = 1 ]; then systemctl restart kombain-xray; sleep 2; fi
+    fi
+    exit_ip=$(curl -4 -fsS --max-time 10 -x "socks5h://127.0.0.1:$KB_SOCKS_PORT" https://api.ipify.org 2>/dev/null || true)
+    own_ip=$(curl -4 -fsS --max-time 6 https://api.ipify.org 2>/dev/null || true)
+    [[ $exit_ip =~ ^[0-9.]+$ ]] || exit_ip=""
+    [[ $own_ip =~ ^[0-9.]+$ ]] || own_ip=""
+  fi
   # is the server itself choking: crashes, memory kills, the connection table, a stolen CPU
   local restarts=0 oom=0 swap_total swap_free ct=0 ct_max=0 steal=0 cpus=1 xray_rss=0 a b pid n
   if [ "$KB_SYSTEMD" = 1 ]; then
@@ -1038,9 +1055,9 @@ cmd_stats() {
   b=$(awk '/^cpu / {t=0; for (i=2;i<=NF;i++) t+=$i; print t, $9}' /proc/stat)
   steal=$(awk -v a="$a" -v b="$b" 'BEGIN {split(a,x," "); split(b,y," "); d=y[1]-x[1]; if (d > 0) printf "%d", (y[2]-x[2])*100/d; else print 0}')
   local json
-  json=$(printf '{"uptime":%s,"load":"%s","memTotalKb":%s,"memAvailKb":%s,"diskPct":%s,"rx":%s,"tx":%s,"role":"%s","protocols":"%s","services":[%s],"users":[%s],"restarts":%s,"oom":%s,"swapUsedKb":%s,"conntrack":%s,"conntrackMax":%s,"steal":%s,"cpus":%s,"xrayRssKb":%s}' \
+  json=$(printf '{"uptime":%s,"load":"%s","memTotalKb":%s,"memAvailKb":%s,"diskPct":%s,"rx":%s,"tx":%s,"role":"%s","protocols":"%s","services":[%s],"users":[%s],"restarts":%s,"oom":%s,"swapUsedKb":%s,"conntrack":%s,"conntrackMax":%s,"steal":%s,"cpus":%s,"xrayRssKb":%s,"exitIp":"%s","ownIp":"%s","exitAddr":"%s"}' \
     "${up:-0}" "$load" "${mem_total:-0}" "${mem_avail:-0}" "${disk:-0}" "${rx:-0}" "${tx:-0}" "$ROLE" "$PROTOCOLS" "$svcs" "$users" \
-    "${restarts:-0}" "${oom:-0}" "$(( ${swap_total:-0} - ${swap_free:-0} ))" "${ct:-0}" "${ct_max:-0}" "${steal:-0}" "${cpus:-1}" "${xray_rss:-0}")
+    "${restarts:-0}" "${oom:-0}" "$(( ${swap_total:-0} - ${swap_free:-0} ))" "${ct:-0}" "${ct_max:-0}" "${steal:-0}" "${cpus:-1}" "${xray_rss:-0}" "$exit_ip" "$own_ip" "${EXIT_ADDR:-}")
   echo "KB_STATS $(printf '%s' "$json" | base64 | tr -d '\n')"
 }
 
