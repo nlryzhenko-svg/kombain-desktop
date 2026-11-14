@@ -84,7 +84,7 @@ state_file() { echo "$KB_DIR/state.env"; }
 users_file() { echo "$KB_DIR/users"; }
 
 load_state() {
-  [ -f "$(state_file)" ] || die "Kombain на этом сервере ещё не установлен"
+  [ -f "$(state_file)" ] || die "DAK на этом сервере ещё не установлен"
   # shellcheck disable=SC1090
   . "$(state_file)"
   XH_PORT=${XH_PORT:-8443}; TUIC_PORT=${TUIC_PORT:-8443}; XH_PATH=${XH_PATH:-/$(rand_hex 6)}
@@ -545,7 +545,7 @@ apply_hop() {
   if [ -f "$KB_DIR/hop.sh" ]; then
     cat > /etc/systemd/system/kombain-hop.service <<EOF
 [Unit]
-Description=Kombain: Hysteria2 port hopping
+Description=DAK: Hysteria2 port hopping
 After=network-online.target
 [Service]
 Type=oneshot
@@ -630,7 +630,7 @@ write_units() {
   [ "$KB_SYSTEMD" = 1 ] || return 0
   cat > /etc/systemd/system/kombain-xray.service <<EOF
 [Unit]
-Description=Kombain Xray
+Description=DAK Xray
 After=network-online.target
 [Service]
 Environment=XRAY_LOCATION_ASSET=$KB_SHARE
@@ -644,7 +644,7 @@ EOF
   if has_proto tuic; then
     cat > /etc/systemd/system/kombain-tuic.service <<EOF
 [Unit]
-Description=Kombain TUIC
+Description=DAK TUIC
 After=network-online.target kombain-xray.service
 [Service]
 ExecStart=$KB_BIN/kombain-singbox run -c $KB_DIR/tuic.json
@@ -658,7 +658,7 @@ EOF
   if has_proto hy2; then
     cat > /etc/systemd/system/kombain-hysteria.service <<EOF
 [Unit]
-Description=Kombain Hysteria2
+Description=DAK Hysteria2
 After=network-online.target kombain-xray.service
 [Service]
 ExecStart=$KB_BIN/kombain-hysteria server -c $KB_DIR/hysteria.yaml
@@ -672,7 +672,7 @@ EOF
   if has_proto sudoku; then
     cat > /etc/systemd/system/kombain-sudoku.service <<EOF
 [Unit]
-Description=Kombain Sudoku
+Description=DAK Sudoku
 After=network-online.target
 [Service]
 WorkingDirectory=$KB_DIR
@@ -687,7 +687,7 @@ EOF
   if has_proto tg; then
     cat > /etc/systemd/system/kombain-mtg.service <<EOF
 [Unit]
-Description=Kombain Telegram proxy (mtg)
+Description=DAK Telegram proxy (mtg)
 After=network-online.target kombain-xray.service
 [Service]
 ExecStart=$KB_BIN/kombain-mtg run $KB_DIR/mtg.toml
@@ -701,7 +701,7 @@ EOF
   if [ -n "$SUB_PORT" ]; then
     cat > /etc/systemd/system/kombain-sub.service <<EOF
 [Unit]
-Description=Kombain subscription (HTTPS)
+Description=DAK subscription (HTTPS)
 After=network-online.target
 [Service]
 WorkingDirectory=$KB_DIR/sub
@@ -905,7 +905,7 @@ cmd_install() {
   ROLE=single; HOST=""; PROTOCOLS="vless,xhttp,hy2"; SNI="www.microsoft.com"; PORT=443; HY_PORT=443
   XH_PORT=8443; TUIC_PORT=8443; TG_PORT=9443; TG_SECRET=""; DEST=""; SUB_PORT=$((20000 + RANDOM % 40000))
   SD_PORT=8880; SD_PUB=""; SD_MPRIV=""
-  NAME="Kombain"; local first_user="Телефон" bridge=0 exit_link="" hop=0
+  NAME="DAK"; local first_user="Телефон" bridge=0 exit_link="" hop=0
   FP=firefox; ANTIFREEZE=1; SNI_ROT=1; SNI_ALTS=""; HY_HOP=""
   while [ $# -gt 0 ]; do
     case $1 in
@@ -1401,14 +1401,14 @@ ports_timer() { # days (0 = off)
       install -m 700 "$0" "$KB_DIR/kombain-node.sh"
       cat > /etc/systemd/system/kombain-ports.service <<EOF
 [Unit]
-Description=Kombain: random new VPN ports
+Description=DAK: random new VPN ports
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/env bash $KB_DIR/kombain-node.sh shuffle-ports
 EOF
       cat > /etc/systemd/system/kombain-ports.timer <<EOF
 [Unit]
-Description=Kombain: change VPN ports every $days day(s)
+Description=DAK: change VPN ports every $days day(s)
 [Timer]
 OnCalendar=*-*-1/$days 04:00:00
 RandomizedDelaySec=2h
@@ -1513,7 +1513,7 @@ cmd_import() {
   [ -n "$host" ] && [ -n "$data" ] || die "нужны --host и --data"
   [ "$KB_SYSTEMD" = 1 ] && need_root
   if [ -f "$(state_file)" ] && [ $force = 0 ]; then
-    die "на этом сервере уже стоит Kombain — переезд затрёт его настройки"
+    die "на этом сервере уже стоит DAK — переезд затрёт его настройки"
   fi
   step "Сервер: $(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-Linux}"), $(uname -m)"
   install_packages
@@ -1564,7 +1564,7 @@ cmd_uninstall() {
     systemctl daemon-reload
   fi
   rm -rf "$KB_DIR" "$KB_SHARE" "$KB_BIN/kombain-xray" "$KB_BIN/kombain-hysteria" "$KB_BIN/kombain-singbox" "$KB_BIN/kombain-mtg" "$KB_BIN/kombain-sudoku"
-  step "Kombain удалён с сервера"
+  step "DAK удалён с сервера"
 }
 
 # the copy kept for the port timer follows app updates
