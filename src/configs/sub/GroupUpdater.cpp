@@ -634,12 +634,73 @@ namespace Subscription {
         return next;
     }
 
+    namespace {
+        // Kryo 5 string as NekoBox writes it: ASCII with the high bit on the last byte, or a flagged var-int
+        // char count (+1) followed by UTF-8.
+        bool readKryoString(const QByteArray &b, int &pos, QString &out) {
+            if (pos >= b.size()) return false;
+            const auto u = [&](int i) { return static_cast<quint8>(b[i]); };
+            if ((u(pos) & 0x80) == 0) {
+                QByteArray ascii;
+                while (pos < b.size()) {
+                    const quint8 c = u(pos++);
+                    ascii += static_cast<char>(c & 0x7F);
+                    if (c & 0x80) break;
+                }
+                out = QString::fromLatin1(ascii);
+                return true;
+            }
+            quint32 count = u(pos) & 0x3F;
+            bool more = u(pos++) & 0x40;
+            for (int shift = 6; more && shift <= 27 && pos < b.size(); shift += 7) {
+                const quint8 c = u(pos++);
+                count |= static_cast<quint32>(c & 0x7F) << shift;
+                more = c & 0x80;
+            }
+            if (count == 0) { out.clear(); return true; } // null
+            int chars = static_cast<int>(count) - 1;
+            const int start = pos;
+            while (chars > 0 && pos < b.size()) {
+                const quint8 c = u(pos);
+                pos += c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+                chars -= c >= 0xF0 ? 2 : 1;
+            }
+            if (pos > b.size()) return false;
+            out = QString::fromUtf8(b.mid(start, pos - start));
+            return true;
+        }
+
+        // sn://subscription?<base64url(zlib(kryo(group)))> — «Поделиться» of a group in NekoBox / DAK on the phone
+        QString unwrapKryoGroup(const QString &payload, QString *name) {
+            const auto packed = QByteArray::fromBase64(payload.toLatin1(), QByteArray::Base64UrlEncoding);
+            if (packed.size() < 8) return {};
+            QByteArray withSize(4, 0);
+            const quint32 guess = 1u << 20;
+            withSize[0] = static_cast<char>(guess >> 24); withSize[1] = static_cast<char>(guess >> 16);
+            withSize[2] = static_cast<char>(guess >> 8);  withSize[3] = static_cast<char>(guess);
+            const auto raw = qUncompress(withSize + packed);
+            int pos = 4; // version
+            QString groupName, link;
+            if (!readKryoString(raw, pos, groupName)) return {};
+            pos += 4 + 4 + 4; // group type, subscription version, subscription type
+            if (!readKryoString(raw, pos, link)) return {};
+            if (name != nullptr) *name = groupName;
+            return link;
+        }
+    }
+
     QString UnwrapSnSubscription(const QString &link, QString *name) {
         const auto t = link.trimmed();
         if (!t.startsWith("sn://subscription?", Qt::CaseInsensitive)) return {};
-        const QUrlQuery q(t.mid(t.indexOf('?') + 1));
-        const auto url = q.queryItemValue("url", QUrl::FullyDecoded);
-        if (name != nullptr) *name = q.queryItemValue("name", QUrl::FullyDecoded);
+        const auto query = t.mid(t.indexOf('?') + 1);
+        QString url;
+        if (query.startsWith("url=")) {
+            const QUrlQuery q(query);
+            url = q.queryItemValue("url", QUrl::FullyDecoded);
+            if (name != nullptr) *name = q.queryItemValue("name", QUrl::FullyDecoded);
+        } else {
+            url = unwrapKryoGroup(query, name);
+        }
         return url.startsWith("http://") || url.startsWith("https://") ? url : QString();
     }
 
