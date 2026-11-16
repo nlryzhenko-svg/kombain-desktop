@@ -124,7 +124,21 @@ namespace Configs_network {
         });
         QByteArray body;
         bool tooLarge = false;
+        // A DAK server answers the subscription with openssl s_server -WWW: HTTP/1.0 without Content-Length,
+        // ended by a TLS close_notify that Qt does not treat as the end of the body. Once the body has stopped
+        // growing for a moment it is complete.
+        bool kbIdleDone = false;
+        QTimer kbIdle;
+        kbIdle.setSingleShot(true);
+        if (!kbPin.isEmpty()) {
+            connect(&kbIdle, &QTimer::timeout, _reply, [&] {
+                if (_reply->isFinished()) return;
+                kbIdleDone = true;
+                _reply->abort();
+            });
+        }
         connect(_reply, &QNetworkReply::readyRead, _reply, [&] {
+            if (!kbPin.isEmpty()) kbIdle.start(1500);
             if (body.isEmpty()) {
                 const auto expected = _reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
                 const qint64 reserveCap = maxBytes > 0 ? maxBytes : 256LL * 1024 * 1024;
@@ -145,6 +159,9 @@ namespace Configs_network {
         result.header = _reply->rawHeaderPairs();
         if (kbPinMismatch) {
             result.error = QStringLiteral("Сертификат сервера подписки не совпал с закреплённым в ссылке — возьмите свежую ссылку в DAK на телефоне");
+        } else if (kbIdleDone && !body.isEmpty()
+                   && _reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() / 100 == 2) {
+            result.data = std::move(body);
         } else if (tooLarge) {
             result.error = QObject::tr("Response larger than %1 MB").arg(maxBytes / (1024 * 1024));
         } else {

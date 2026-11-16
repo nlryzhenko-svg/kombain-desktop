@@ -16,6 +16,9 @@
 #include "include/global/DeviceDetailsHelper.hpp"
 
 namespace Subscription {
+    // sn://subscription?url=…&name=… (how DAK on the phone shares a subscription) → the https URL; empty otherwise.
+    QString UnwrapSnSubscription(const QString &link, QString *name = nullptr);
+
     struct RequestIdentity {
         QString userAgent;
         bool sendHwid = false;
@@ -83,7 +86,7 @@ namespace Subscription {
         // Epoch seconds of the next automatic refresh (<= now: due), -1 when none is scheduled. UI thread only.
         [[nodiscard]] qint64 NextAutoUpdate() const;
 
-        void SubscribeUrl(const QString &url, const Finish &finish = nullptr);
+        void SubscribeUrl(const QString &url, const Finish &finish = nullptr, const QString &name = {});
 
         void ImportUrl(const QString &url, const Finish &finish = nullptr);
 

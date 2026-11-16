@@ -1,3 +1,4 @@
+#include <QUrlQuery>
 #include "include/configs/sub/GroupUpdater.hpp"
 
 #include "include/configs/generate.h"
@@ -633,11 +634,20 @@ namespace Subscription {
         return next;
     }
 
-    void GroupUpdater::SubscribeUrl(const QString &url, const Finish &finish) {
+    QString UnwrapSnSubscription(const QString &link, QString *name) {
+        const auto t = link.trimmed();
+        if (!t.startsWith("sn://subscription?", Qt::CaseInsensitive)) return {};
+        const QUrlQuery q(t.mid(t.indexOf('?') + 1));
+        const auto url = q.queryItemValue("url", QUrl::FullyDecoded);
+        if (name != nullptr) *name = q.queryItemValue("name", QUrl::FullyDecoded);
+        return url.startsWith("http://") || url.startsWith("https://") ? url : QString();
+    }
+
+    void GroupUpdater::SubscribeUrl(const QString &url, const Finish &finish, const QString &name) {
         const auto content = url.trimmed();
         enqueue({-1, false, [=, this] {
             auto group = Configs::GroupsRepo::NewGroup();
-            group->name = QUrl(content).host();
+            group->name = name.isEmpty() ? QUrl(content).host() : name;
             group->url = content;
             // Stored before the download: a failed one is fixed through the group's own TLS, HTTP and User Agent settings.
             Configs::dataManager->groupsRepo->AddGroup(group);
@@ -812,6 +822,9 @@ namespace Subscription {
     bool GroupUpdater::fetch(const QString &url, const QString &name, const RequestIdentity &identity, QByteArray &body,
                              Configs::SubUserInfo &subInfo, QString *error, QString *routing) {
         MW_show_log(">>>>>>>> " + QObject::tr("Requesting subscription: %1").arg(name));
+        // DAK on the phone shares a subscription as sn://subscription?url=…&name=…
+        if (QString inner = UnwrapSnSubscription(url); !inner.isEmpty() && inner != url)
+            return fetch(inner, name, identity, body, subInfo, error, routing);
         HttpGetOptions options;
         options.maxBytes = kMaxSubscriptionBytes;
         options.userAgent = identity.userAgent;

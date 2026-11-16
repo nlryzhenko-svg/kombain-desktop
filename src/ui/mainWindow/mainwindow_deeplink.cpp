@@ -1,3 +1,4 @@
+#include <QRegularExpression>
 #include "include/ui/mainwindow.h"
 
 #include <algorithm>
@@ -263,6 +264,11 @@ void MainWindow::import_or_handle_deeplink(const QString &text) {
 
 void MainWindow::import_text(const QString &text) {
     const auto content = text.trimmed();
+    // a subscription shared from DAK on the phone: becomes a group that keeps itself up to date
+    if (QString name, url = Subscription::UnwrapSnSubscription(content.section(QRegularExpression("\\s"), 0, 0), &name); !url.isEmpty()) {
+        Subscription::updater()->SubscribeUrl(url, nullptr, name);
+        return;
+    }
     if (content.startsWith("http://") || content.startsWith("https://")) {
         const QStringList items{
             QObject::tr("Add profiles to this group"),

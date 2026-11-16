@@ -1053,6 +1053,8 @@ namespace Subscription {
             const char *profileType = typeForScheme(line);
             if (profileType == nullptr) {
                 if (isRoutingLink(line)) return;
+                // DAK servers also hand out Sudoku for the phone; the computer has no Sudoku engine yet
+                if (scan::startsWithNoCase(line, "sudoku://")) return;
                 if (const auto scheme = linkScheme(line); !scheme.empty() && sink.report) {
                     const auto written = toQString(scheme);
                     const auto lower = written.toLower();
