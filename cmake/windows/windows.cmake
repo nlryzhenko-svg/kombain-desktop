@@ -7,11 +7,11 @@ include(cmake/windows/generate_product_version.cmake)
 generate_product_version(
         QV2RAY_RC
         ICON "${CMAKE_SOURCE_DIR}/res/Throne.ico"
-        NAME "Throne"
-        BUNDLE "Throne"
-        COMPANY_NAME "Throne"
-        COMPANY_COPYRIGHT "Throne"
-        FILE_DESCRIPTION "Throne"
+        NAME "DAK"
+        BUNDLE "DAK"
+        COMPANY_NAME "DAK"
+        COMPANY_COPYRIGHT "DAK (GPL-3.0, based on Throne)"
+        FILE_DESCRIPTION "DAK VPN"
         ORIGINAL_FILENAME "Throne.exe"
         VERSION_MAJOR ${NKR_VERSION_MAJOR}
         VERSION_MINOR ${NKR_VERSION_MINOR}

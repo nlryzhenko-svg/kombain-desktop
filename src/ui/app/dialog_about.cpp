@@ -16,13 +16,13 @@
 #include "include/global/Configs.hpp"
 
 DialogAbout::DialogAbout(QWidget *parent) : QDialog(parent) {
-    setWindowTitle(QStringLiteral("О Kombain"));
+    setWindowTitle(QStringLiteral("О DAK"));
 
     auto *icon = new QLabel(this);
     icon->setPixmap(QIcon(QStringLiteral(":/Throne/Throne.png")).pixmap(64));
     icon->setAlignment(Qt::AlignTop);
 
-    auto *title = new QLabel(QStringLiteral("Kombain"), this);
+    auto *title = new QLabel(QStringLiteral("DAK"), this);
     auto titleFont = title->font();
     titleFont.setBold(true);
     if (titleFont.pointSizeF() > 0) {
@@ -65,12 +65,12 @@ DialogAbout::DialogAbout(QWidget *parent) : QDialog(parent) {
     top->addWidget(icon);
     top->addLayout(text, 1);
 
-    auto *github = new QPushButton(QStringLiteral("Kombain на GitHub"), this);
+    auto *github = new QPushButton(QStringLiteral("DAK на GitHub"), this);
     github->setAutoDefault(false);
     connect(github, &QPushButton::clicked, this, [] {
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/nlryzhenko-svg/kombain-desktop")));
     });
-    auto *support = new QPushButton(tr("Support Throne"), this);
+    auto *support = new QPushButton(QStringLiteral("Поддержать авторов Throne"), this);
     support->setAutoDefault(false);
     connect(support, &QPushButton::clicked, this, [] {
         QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/throneproj/Throne/blob/dev/.github/donate/Donate.md")));

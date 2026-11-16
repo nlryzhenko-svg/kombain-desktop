@@ -184,7 +184,7 @@ namespace Engine::Bootstrap {
     }
 
     void SetSoftwareNames() {
-        software_name = "Kombain";
+        software_name = "DAK";
         software_core_name = "sing-box";
     }
 
@@ -201,6 +201,7 @@ namespace Engine::Bootstrap {
 #ifdef NKR_CPP_USE_APPDATA
         res.useAppdata = true;
 #endif
+        // the data folder keeps its old name: settings and servers survive the rename to DAK
         QCoreApplication::setApplicationName("Kombain");
         if (res.useAppdata) {
             if (!res.appdataDir.isEmpty()) {

@@ -520,7 +520,8 @@ private:
     QHash<int, QString> m_scannerNames;
     bool m_scannerPanelShown = false;
 
-    void CheckUpdate();
+    // silent: the automatic check at start — no message when there is nothing new or the check failed
+    void CheckUpdate(bool silent = false);
 
     void OpenDashboard();
 

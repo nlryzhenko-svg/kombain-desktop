@@ -362,6 +362,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         m_autoSelectorDialog->activateWindow();
     });
     connect(ui->actionCheck_For_Update, &QAction::triggered, this, [=,this] { runOnNewThread([=,this] { CheckUpdate(); }); });
+    // DAK: look for a new version a minute after start (quietly; a dialog only when there is one)
+    QTimer::singleShot(60 * 1000, this, [=,this] { runOnNewThread([=,this] { CheckUpdate(true); }); });
     connect(ui->actionAbout, &QAction::triggered, this, [=, this] {
         USE_DIALOG(DialogAbout)
     });

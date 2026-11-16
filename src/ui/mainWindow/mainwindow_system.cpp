@@ -285,7 +285,7 @@ bool isNewer(const QString &version) {
 }
 
 // Sections after the running version up to the offered one; a stable release's own section covers its pre-releases.
-QString releaseNotes(const QString &changelog, const QString &target) {
+[[maybe_unused]] QString releaseNotes(const QString &changelog, const QString &target) {
     const auto current = parseVersion(NKR_VERSION);
     const auto offered = parseVersion(target);
     if (!current || !offered) return {};
@@ -382,7 +382,7 @@ void MainWindow::OpenDashboard() {
     });
 }
 
-void MainWindow::CheckUpdate() {
+void MainWindow::CheckUpdate(bool silent) {
     QString search;
 #ifdef Q_OS_WIN
 #  ifdef Q_PROCESSOR_ARM_64
@@ -419,18 +419,21 @@ void MainWindow::CheckUpdate() {
         return;
     }
 
+    // DAK: updates come from DAK's own releases; each carries «DAK-<ver>-windows64-update.zip» (folder Throne/ for the updater).
     // Releases carry no checksum or signature, so TLS is all that vouches for the download URL and the archive.
+    search = QStringLiteral("windows64-update");
     HttpGetOptions options;
     options.strictTls = true;
-    auto resp = NetworkRequestHelper::HttpGet("https://api.github.com/repos/throneproj/Throne/releases", options);
+    auto resp = NetworkRequestHelper::HttpGet("https://api.github.com/repos/nlryzhenko-svg/kombain-desktop/releases", options);
     if (!resp.error.isEmpty()) {
+        if (silent) return;
         runOnUiThread([=,this] {
             MessageBoxWarning(QObject::tr("Update"), QObject::tr("Requesting update error: %1").arg(resp.error + "\n" + resp.data));
         });
         return;
     }
 
-    QString release_tag, release_download_url, release_url;
+    QString release_tag, release_download_url, release_url, release_body;
     bool pre_release = false;
     QJsonArray array = QString2QJsonArray(resp.data);
     for (const QJsonValue value : array) {
@@ -442,6 +445,7 @@ void MainWindow::CheckUpdate() {
                 release_url = release["html_url"].toString();
                 release_tag = release["tag_name"].toString();
                 release_download_url = asset["browser_download_url"].toString();
+                release_body = release["body"].toString();
                 break;
             }
         }
@@ -449,17 +453,14 @@ void MainWindow::CheckUpdate() {
     }
 
     if (release_download_url.isEmpty() || !isNewer(release_tag)) {
+        if (silent) return;
         runOnUiThread([=,this] {
             MessageBoxInfo(QObject::tr("Update"), QObject::tr("No update"));
         });
         return;
     }
 
-    options.headers = {{"Accept", "application/vnd.github.raw+json"}};
-    const auto changelog = NetworkRequestHelper::HttpGet(
-        QStringLiteral("https://api.github.com/repos/throneproj/Throne/contents/CHANGELOG.md?ref=") +
-            QString::fromLatin1(QUrl::toPercentEncoding(release_tag)), options);
-    const auto notes = changelog.error.isEmpty() ? releaseNotes(QString::fromUtf8(changelog.data), release_tag) : QString();
+    const auto notes = release_body.trimmed();
 
     runOnUiThread([=,this] {
         const auto headless = Sys::HostPresence::OtherHeadless();

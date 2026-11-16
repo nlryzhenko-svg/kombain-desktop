@@ -144,7 +144,7 @@ namespace Configs_network {
         HTTPResponse result;
         result.header = _reply->rawHeaderPairs();
         if (kbPinMismatch) {
-            result.error = QStringLiteral("Сертификат сервера подписки не совпал с закреплённым в ссылке — возьмите свежую ссылку в Kombain на телефоне");
+            result.error = QStringLiteral("Сертификат сервера подписки не совпал с закреплённым в ссылке — возьмите свежую ссылку в DAK на телефоне");
         } else if (tooLarge) {
             result.error = QObject::tr("Response larger than %1 MB").arg(maxBytes / (1024 * 1024));
         } else {

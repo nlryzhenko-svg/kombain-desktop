@@ -356,7 +356,9 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     const int logFontSize = Configs::dataManager->settingsRepo->log_font_size;
     ui->log_font_size->setCurrentText(Int2String(logFontSize > 0 ? logFontSize : qApp->font().pointSize()));
     CACHE.shownLogFontSize = ui->log_font_size->currentText().toInt();
-    ui->theme->addItems({"Kombain", "KombainLight"});
+    // the stored ids stay "Kombain" / "KombainLight"; the user sees the DAK names
+    ui->theme->addItem(QStringLiteral("DAK — тёмная"), QStringLiteral("Kombain"));
+    ui->theme->addItem(QStringLiteral("DAK — светлая"), QStringLiteral("KombainLight"));
     ui->theme->addItems(QStyleFactory::keys());
     ui->theme->addItem("QDarkStyle");
     // Custom stylesheet themes, not QStyleFactory keys.
@@ -393,12 +395,16 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     auto themeId = Configs::dataManager->settingsRepo->theme.toInt(&ok);
     if (ok) {
         ui->theme->setCurrentIndex(themeId);
+    } else if (const int byId = ui->theme->findData(Configs::dataManager->settingsRepo->theme); byId >= 0) {
+        ui->theme->setCurrentIndex(byId);
     } else {
         ui->theme->setCurrentText(Configs::dataManager->settingsRepo->theme);
     }
     connect(ui->theme, &QComboBox::currentIndexChanged, this, [=,this](int index) {
-        themeManager()->ApplyTheme(ui->theme->currentText());
-        Configs::dataManager->settingsRepo->theme = ui->theme->currentText().trimmed();
+        const QString theme = ui->theme->currentData().toString().isEmpty() ? ui->theme->currentText().trimmed()
+                                                                            : ui->theme->currentData().toString();
+        themeManager()->ApplyTheme(theme);
+        Configs::dataManager->settingsRepo->theme = theme;
         Configs::dataManager->settingsRepo->Save();
         refreshUrlSchemeStatus();
     });

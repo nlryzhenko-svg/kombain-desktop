@@ -185,7 +185,8 @@ namespace GuiStartup {
                 locale = "ru_RU";
                 break;
             default:
-                locale = QLocale().name();
+                // DAK is made for Russia: Russian unless the user picks another language
+                locale = QLocale().name().startsWith("zh") || QLocale().name().startsWith("fa") ? QLocale().name() : QStringLiteral("ru_RU");
         }
         QGuiApplication::tr("QT_LAYOUT_DIRECTION");
         guiStartupLoadTranslate(locale);

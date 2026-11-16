@@ -31,6 +31,10 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QHash>
+#include <QPointer>
+#include <memory>
+#include <QComboBox>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QMessageBox>
@@ -98,7 +102,7 @@ namespace Kombain {
         o["sni"] = sni; o["hostKey"] = hostKey; o["sshPort"] = sshPort; o["role"] = role; o["exitId"] = exitId;
         o["protocols"] = protocols; o["vpnPort"] = vpnPort; o["xhPort"] = xhPort; o["hyPort"] = hyPort;
         o["tuicPort"] = tuicPort; o["tgPort"] = tgPort; o["groupId"] = groupId; o["stats"] = stats; o["statsAt"] = statsAt;
-        o["health"] = health;
+        o["health"] = health; o["fp"] = fp; o["hyHop"] = hyHop; o["antifreeze"] = antifreeze; o["sniRotation"] = sniRotation;
         return o;
     }
 
@@ -113,6 +117,8 @@ namespace Kombain {
         n.tgPort = o["tgPort"].toInt(9443);
         n.groupId = o["groupId"].toInt(-1); n.stats = o["stats"].toString();
         n.statsAt = o["statsAt"].toVariant().toLongLong(); n.health = o["health"].toString();
+        n.fp = o["fp"].toString("firefox"); n.hyHop = o["hyHop"].toString();
+        n.antifreeze = o["antifreeze"].toBool(); n.sniRotation = o["sniRotation"].toBool();
         return n;
     }
 
@@ -161,6 +167,8 @@ namespace Kombain {
             else if (p == "hy2") out << "Hysteria2";
             else if (p == "tuic") out << "TUIC";
             else if (p == "tg") out << "Telegram";
+            else if (p == "sudoku") out << "Sudoku";
+            else if (p == "awg") out << "AmneziaWG";
             else out << p;
         }
         return out.join(" + ");
@@ -188,6 +196,36 @@ namespace Kombain {
         return QString("%1 мин").arg(s / 60);
     }
 
+    // entry node of a cascade: traffic must leave through the exit server
+    static QString exitProblem(const QJsonObject &st) {
+        const auto addr = st["exitAddr"].toString();
+        if (addr.isEmpty()) return {};
+        const auto exitIp = st["exitIp"].toString();
+        if (exitIp.isEmpty()) return "Нет связи с выходным сервером " + addr + " — заблокированные сайты не откроются";
+        if (exitIp == st["ownIp"].toString()) return "Трафик выходит с самого российского сервера, а не через " + addr;
+        return {};
+    }
+
+    // signs that the server itself chokes — why connections hang on a "working" server
+    static QStringList overload(const QJsonObject &st) {
+        QStringList r;
+        const int oom = st["oom"].toInt();
+        if (oom > 0) r << QString("Серверу не хватает памяти: система убивала процессы (%1 раз). Нужен тариф с ОЗУ побольше или меньше протоколов").arg(oom);
+        const int restarts = st["restarts"].toInt();
+        if (restarts > 0) r << QString("Службы VPN падали и перезапускались (%1 раз) — в эти моменты связь обрывается").arg(restarts);
+        const qint64 ct = st["conntrack"].toVariant().toLongLong(), ctMax = st["conntrackMax"].toVariant().toLongLong();
+        if (ctMax > 0 && ct * 100 / ctMax >= 80) r << QString("Таблица соединений почти заполнена (%1 из %2) — новые соединения теряются").arg(ct).arg(ctMax);
+        const int steal = st["steal"].toInt();
+        if (steal >= 20) r << QString("Хостер забирает %1% процессора (перегруженный VPS) — отсюда подвисания").arg(steal);
+        const qint64 total = st["memTotalKb"].toVariant().toLongLong(), avail = st["memAvailKb"].toVariant().toLongLong();
+        const qint64 swap = st["swapUsedKb"].toVariant().toLongLong();
+        if (total > 0 && avail * 100 / total < 10 && swap > 64 * 1024) r << "Память на исходе, сервер работает с диска (swap) — всё тормозит";
+        const double load = st["load"].toString().section(' ', 0, 0).toDouble();
+        const int cpus = qMax(1, st["cpus"].toInt(1));
+        if (load > cpus * 2) r << QString("Процессор перегружен (нагрузка %1 при %2 ядр.)").arg(load).arg(cpus);
+        return r;
+    }
+
     static QString healthProblem(const QJsonObject &st) {
         QStringList down;
         for (const auto &v: st["services"].toArray()) {
@@ -197,7 +235,12 @@ namespace Kombain {
         }
         if (!down.isEmpty()) return "Не работает: " + down.join(", ");
         if (st["diskPct"].toInt() >= 95) return QString("Диск заполнен на %1%").arg(st["diskPct"].toInt());
-        return {};
+        const qint64 total = st["memTotalKb"].toVariant().toLongLong(), avail = st["memAvailKb"].toVariant().toLongLong();
+        if (total > 0 && avail * 100 / total < 3) return "Почти нет свободной памяти";
+        const auto ex = exitProblem(st);
+        if (!ex.isEmpty()) return ex;
+        const auto bad = overload(st);
+        return bad.isEmpty() ? QString() : bad.first();
     }
 
     static QString healthSummary(const QJsonObject &st) {
@@ -234,12 +277,12 @@ namespace Kombain {
             if (!buffer.isEmpty()) handleLine(QString::fromUtf8(buffer).trimmed());
             buffer.clear();
             if (code != 0 && error.isEmpty()) error = QString("Помощник завершился с кодом %1").arg(code);
-            const bool ok = error.isEmpty() && (!result.isEmpty() || !stats.isEmpty() || args.value(0) == "status" || args.value(0) == "uninstall");
+            const bool ok = error.isEmpty() && (!result.isEmpty() || !stats.isEmpty() || args.value(0) == "status" || args.value(0) == "uninstall" || args.value(0) == "find-sni");
             emit finished(ok);
         });
         connect(&proc, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
             if (e == QProcess::FailedToStart) {
-                error = "Не найден kombain-node — переустановите Kombain";
+                error = "Не найден kombain-node — переустановите DAK";
                 emit finished(false);
             }
         });
@@ -254,6 +297,7 @@ namespace Kombain {
             const auto fp = l.mid(11);
             if (node.hostKey.isEmpty()) { node.hostKey = fp; emit line("Отпечаток сервера: " + fp); }
         } else if (l.startsWith("KB_RESULT ")) result = QJsonDocument::fromJson(QByteArray::fromBase64(l.mid(10).toLatin1())).object();
+        else if (l.startsWith("KB_SNI ")) sites = QJsonDocument::fromJson(QByteArray::fromBase64(l.mid(7).toLatin1())).array();
         else if (l.startsWith("KB_STATS ")) stats = QJsonDocument::fromJson(QByteArray::fromBase64(l.mid(9).toLatin1())).object();
         else emit line("  " + l);
     }
@@ -293,7 +337,7 @@ namespace Kombain {
         QDialog dlg(parent);
         dlg.setWindowTitle(title);
         auto *lay = new QVBoxLayout(&dlg);
-        auto *hint = new QLabel("Отсканируйте QR-код в Kombain на телефоне, Happ, v2rayNG или Hiddify.\nКаждая вкладка — отдельный протокол.");
+        auto *hint = new QLabel("Отсканируйте QR-код в DAK на телефоне, Happ, v2rayNG или Hiddify.\nКаждая вкладка — отдельный протокол.");
         hint->setProperty("kombainMuted", true);
         lay->addWidget(hint);
         auto *tabs = new QTabWidget;
@@ -356,7 +400,7 @@ namespace Kombain {
         QObject::connect(open, &QPushButton::clicked, &dlg, [&dlg, tgLink, web, open] {
             if (!QDesktopServices::openUrl(QUrl(tgLink))) {
                 QGuiApplication::clipboard()->setText(web);
-                QMessageBox::information(&dlg, "Kombain", "Telegram Desktop не найден — ссылка скопирована. Откройте её в любом Telegram.");
+                QMessageBox::information(&dlg, "DAK", "Telegram Desktop не найден — ссылка скопирована. Откройте её в любом Telegram.");
             } else {
                 open->setText("Открыто ✓");
             }
@@ -383,16 +427,19 @@ namespace Kombain {
         QLineEdit *name, *host, *user, *pass;
         QSpinBox *port;
         QPlainTextEdit *key;
+        QLabel *hintLabel;
+        QPushButton *goBtn;
         ServerNode node;
 
         explicit ConnectDialog(QWidget *parent) : QDialog(parent) {
             setWindowTitle("Подключить существующий сервер");
             auto *lay = new QVBoxLayout(this);
-            auto *hint = new QLabel("Сервер, где Kombain уже стоит — например, поднятый с телефона. Ничего не переустанавливается: "
-                                    "Kombain только заберёт ссылки и добавит сервер в список. Ключи не меняются, телефон и другие "
+            auto *hint = new QLabel("Сервер, где DAK уже стоит — например, поднятый с телефона. Ничего не переустанавливается: "
+                                    "DAK только заберёт ссылки и добавит сервер в список. Ключи не меняются, телефон и другие "
                                     "устройства продолжат работать.");
             hint->setWordWrap(true);
             hint->setProperty("kombainMuted", true);
+            hintLabel = hint;
             lay->addWidget(hint);
             auto *box = new QFrame;
             box->setProperty("kombainCard", true);
@@ -426,6 +473,7 @@ namespace Kombain {
             auto *buttons = new QDialogButtonBox;
             auto *go = buttons->addButton("Подключить", QDialogButtonBox::AcceptRole);
             go->setDefault(true);
+            goBtn = go;
             buttons->addButton("Отмена", QDialogButtonBox::RejectRole);
             connect(buttons, &QDialogButtonBox::accepted, this, [this] {
                 node.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -435,8 +483,8 @@ namespace Kombain {
                 node.user = user->text().trimmed().isEmpty() ? "root" : user->text().trimmed();
                 node.password = pass->text();
                 node.key = key->toPlainText().trimmed();
-                if (node.host.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите IP-адрес сервера"); host->setFocus(); return; }
-                if (node.password.isEmpty() && node.key.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите пароль или ключ SSH"); pass->setFocus(); return; }
+                if (node.host.isEmpty()) { QMessageBox::warning(this, "DAK", "Укажите IP-адрес сервера"); host->setFocus(); return; }
+                if (node.password.isEmpty() && node.key.isEmpty()) { QMessageBox::warning(this, "DAK", "Укажите пароль или ключ SSH"); pass->setFocus(); return; }
                 accept();
             });
             connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -562,7 +610,7 @@ namespace Kombain {
             pl->addLayout(ports);
             lay->addWidget(protoBox);
 
-            auto *note = new QLabel("Kombain зайдёт на сервер по SSH, скачает Xray, Hysteria2, sing-box (для TUIC) и mtg (для Telegram) с GitHub, "
+            auto *note = new QLabel("DAK зайдёт на сервер по SSH, скачает Xray, Hysteria2, sing-box (для TUIC) и mtg (для Telegram) с GitHub, "
                                     "создаст ключи, откроет порты и запустит службы. Нужен VPS с Debian или Ubuntu. "
                                     "Пароль хранится на компьютере в зашифрованном виде.");
             note->setWordWrap(true);
@@ -614,9 +662,9 @@ namespace Kombain {
             n.key = f.key->toPlainText().trimmed();
             n.sni = f.sni->text().trimmed().remove("https://").remove('/');
             n.name = f.name->text().trimmed().isEmpty() ? defName : f.name->text().trimmed().remove('|');
-            if (n.host.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите IP-адрес сервера"); f.host->setFocus(); return false; }
-            if (n.password.isEmpty() && n.key.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите пароль или ключ SSH"); f.pass->setFocus(); return false; }
-            if (n.sni.isEmpty()) { QMessageBox::warning(this, "Kombain", "Укажите сайт для маскировки"); return false; }
+            if (n.host.isEmpty()) { QMessageBox::warning(this, "DAK", "Укажите IP-адрес сервера"); f.host->setFocus(); return false; }
+            if (n.password.isEmpty() && n.key.isEmpty()) { QMessageBox::warning(this, "DAK", "Укажите пароль или ключ SSH"); f.pass->setFocus(); return false; }
+            if (n.sni.isEmpty()) { QMessageBox::warning(this, "DAK", "Укажите сайт для маскировки"); return false; }
             n.protocols = protocols();
             n.vpnPort = portVless->value(); n.xhPort = portXhttp->value(); n.hyPort = portHy->value(); n.tuicPort = portTuic->value();
             n.tgPort = portTg->value();
@@ -626,12 +674,12 @@ namespace Kombain {
         ServerNode mainNode, entryNode;
 
         void tryAccept() {
-            if (protocols().isEmpty()) { QMessageBox::warning(this, "Kombain", "Выберите хотя бы один VPN-протокол"); return; }
+            if (protocols().isEmpty()) { QMessageBox::warning(this, "DAK", "Выберите хотя бы один VPN-протокол"); return; }
             const bool tg = pTg->isChecked();
             if ((pXhttp->isChecked() && portXhttp->value() == portVless->value()) ||
                 (pTuic->isChecked() && pHy2->isChecked() && portTuic->value() == portHy->value()) ||
                 (tg && (portTg->value() == portVless->value() || (pXhttp->isChecked() && portTg->value() == portXhttp->value())))) {
-                QMessageBox::warning(this, "Kombain", "Порты одного типа (TCP или UDP) должны различаться");
+                QMessageBox::warning(this, "DAK", "Порты одного типа (TCP или UDP) должны различаться");
                 return;
             }
             if (!readNode(mainForm, cascade->isChecked() ? "Выход" : "Мой сервер", mainNode)) return;
@@ -666,6 +714,10 @@ namespace Kombain {
         n.vpnPort = i["port"].toInt(n.vpnPort); n.xhPort = i["xhPort"].toInt(n.xhPort);
         n.hyPort = i["hyPort"].toInt(n.hyPort); n.tuicPort = i["tuicPort"].toInt(n.tuicPort);
         n.tgPort = i["tgPort"].toInt(n.tgPort);
+        if (i.contains("fp")) n.fp = i["fp"].toString(n.fp);
+        if (i.contains("hyHop")) n.hyHop = i["hyHop"].toString();
+        if (i.contains("antifreeze")) n.antifreeze = i["antifreeze"].toVariant().toInt() != 0;
+        if (i.contains("sniRotation")) n.sniRotation = i["sniRotation"].toVariant().toInt() != 0;
     }
 
     static QString tgNote(const QJsonObject &result) {
@@ -687,7 +739,7 @@ namespace Kombain {
         hl->setContentsMargins(20, 18, 20, 18);
         auto *ht = new QLabel("Свой VPN-сервер");
         ht->setStyleSheet("font-size: 20px; font-weight: 700;");
-        auto *hs = new QLabel("Нужен только VPS с Debian или Ubuntu и доступ по SSH. Kombain сам поставит VLESS Reality, XHTTP, "
+        auto *hs = new QLabel("Нужен только VPS с Debian или Ubuntu и доступ по SSH. DAK сам поставит VLESS Reality, XHTTP, "
                               "Hysteria2, TUIC и прокси для Telegram, настроит и добавит профили. Свой домен не нужен.");
         hs->setWordWrap(true);
         auto *newBtn = new QPushButton("Поднять сервер");
@@ -738,14 +790,14 @@ namespace Kombain {
         outer->addWidget(scroll);
 
         connect(newBtn, &QPushButton::clicked, this, [this] {
-            if (running) { QMessageBox::information(this, "Kombain", "Дождитесь окончания текущей операции"); return; }
+            if (running) { QMessageBox::information(this, "DAK", "Дождитесь окончания текущей операции"); return; }
             ServerWizard w(this);
             if (w.exec() != QDialog::Accepted) return;
             if (w.cascade->isChecked()) installCascade(w.mainNode, w.entryNode);
             else installSingle(w.mainNode);
         });
         connect(connectBtn, &QPushButton::clicked, this, [this] {
-            if (running) { QMessageBox::information(this, "Kombain", "Дождитесь окончания текущей операции"); return; }
+            if (running) { QMessageBox::information(this, "DAK", "Дождитесь окончания текущей операции"); return; }
             ConnectDialog d(this);
             if (d.exec() != QDialog::Accepted) return;
             connectExisting(d.node);
@@ -883,7 +935,7 @@ namespace Kombain {
     void MyServersDialog::connectExisting(ServerNode node) {
         beginTask("Подключаю " + node.host);
         runOn(node, {"links"}, [this](NodeRun *r, bool ok) {
-            if (!ok) return endTask(false, r->error.isEmpty() ? "На сервере не найден Kombain" : r->error);
+            if (!ok) return endTask(false, r->error.isEmpty() ? "На сервере не найден DAK" : r->error);
             auto n = r->node;
             // the same server added twice: update its card
             for (const auto &old: ServerStore::all()) {
@@ -927,7 +979,7 @@ namespace Kombain {
             s.tgPort, 1, 65535, 1, &okInput);
         if (!okInput) return;
         if (port == s.vpnPort || (s.protocols.contains("xhttp") && port == s.xhPort)) {
-            QMessageBox::warning(this, "Kombain", "Этот порт уже занят VLESS или XHTTP — выберите другой.");
+            QMessageBox::warning(this, "DAK", "Этот порт уже занят VLESS или XHTTP — выберите другой.");
             return;
         }
         beginTask("Прокси для Telegram на " + s.name);
@@ -973,6 +1025,15 @@ namespace Kombain {
                 logLine(QString("• %1: %2").arg(o["name"].toString(), o["state"].toString() == "active" ? "работает" : o["state"].toString()));
             }
             logLine("• " + healthSummary(r->stats).replace("\n", "\n• "));
+            if (!r->stats["exitAddr"].toString().isEmpty()) {
+                const auto p = exitProblem(r->stats);
+                logLine(p.isEmpty() ? "• Выход в интернет: через выходной сервер (IP " + r->stats["exitIp"].toString() + ")" : "⚠ " + p);
+            }
+            if (r->stats.contains("steal")) {
+                const auto bad = overload(r->stats);
+                if (bad.isEmpty()) logLine("• Признаков перегрузки нет: не падал, памяти и процессора хватает");
+                for (const auto &b: bad) logLine("⚠ " + b);
+            }
             for (const auto &v: r->stats["users"].toArray()) {
                 const auto u = v.toObject();
                 logLine(QString("• %1: ↓ %2 ↑ %3 (VLESS/XHTTP)").arg(u["name"].toString(),
@@ -1050,7 +1111,7 @@ namespace Kombain {
                     auto *del = new QPushButton("Удалить");
                     del->setProperty("kombainDanger", true);
                     connect(del, &QPushButton::clicked, &dlg, [this, &dlg, u, node] {
-                        if (QMessageBox::question(this, "Kombain", QString("Удалить «%1»? Его ссылки сразу перестанут работать.").arg(u)) != QMessageBox::Yes) return;
+                        if (QMessageBox::question(this, "DAK", QString("Удалить «%1»? Его ссылки сразу перестанут работать.").arg(u)) != QMessageBox::Yes) return;
                         dlg.accept();
                         beginTask(QString("Удаляю пользователя «%1»").arg(u));
                         runOn(node, {"remove-user", u}, [this, u](NodeRun *r2, bool ok2) {
@@ -1134,19 +1195,7 @@ namespace Kombain {
             }
             syncInfo(n, r->result);
             ServerStore::upsert(n);
-            if (n.role == "exit") {
-                const auto bridge = r->result["bridge"].toString();
-                ServerNode entry;
-                bool found = false;
-                for (const auto &x: ServerStore::all()) if (x.role == "entry" && x.exitId == n.id) { entry = x; found = true; }
-                if (!found || bridge.isEmpty()) return endTask(true, "Ключи заменены.");
-                logLine("── Переключаю входной сервер " + entry.name + " на новые ключи");
-                runOn(entry, {"set-exit", "--exit-link", bridge}, [this](NodeRun *r2, bool ok2) {
-                    ServerStore::upsert(r2->node);
-                    endTask(ok2, ok2 ? "Ключи выходного сервера заменены, каскад продолжает работать." : (r2->error.isEmpty() ? "Входной сервер не переключился" : r2->error));
-                });
-                return;
-            }
+            if (n.role == "exit") return relinkEntry(n, r->result, "Ключи выходного сервера заменены, каскад продолжает работать.");
             QString group = n.name;
             if (n.role == "entry") {
                 bool f = false;
@@ -1155,15 +1204,225 @@ namespace Kombain {
             }
             importLinks(n, group, r->result);
             ServerStore::upsert(n);
-            endTask(true, QString("Ключи заменены, профили обновлены. Другим пользователям отправьте новые QR-коды.") +
-                          (r->result["telegram"].toString().isEmpty() ? "" : " Ссылка Telegram-прокси тоже новая."));
+            const QString text = QString("Ключи заменены, профили обновлены. Другим пользователям отправьте новые QR-коды.") +
+                                 (r->result["telegram"].toString().isEmpty() ? "" : " Ссылка Telegram-прокси тоже новая.");
+            if (n.role == "single") return relinkEntry(n, r->result, text);
+            endTask(true, text);
+        });
+    }
+
+    // The server changed what its entry node connects with (keys, port, site): switch the entry over.
+    void MyServersDialog::relinkEntry(const ServerNode &exit, const QJsonObject &result, const QString &okText) {
+        const auto bridge = result["bridge"].toString();
+        ServerNode entry;
+        bool found = false;
+        for (const auto &x: ServerStore::all()) if (x.role == "entry" && x.exitId == exit.id) { entry = x; found = true; }
+        if (!found || bridge.isEmpty()) return endTask(true, okText);
+        logLine("── Переключаю входной сервер " + entry.name + " на новые настройки");
+        runOn(entry, {"set-exit", "--exit-link", bridge}, [this, okText](NodeRun *r2, bool ok2) {
+            ServerStore::upsert(r2->node);
+            endTask(ok2, ok2 ? okText + " Входной сервер переключён." : (r2->error.isEmpty() ? "Входной сервер не переключился" : r2->error));
+        });
+    }
+
+    static const QStringList kPopularSites{"www.microsoft.com", "www.apple.com", "dl.google.com", "www.samsung.com",
+                                            "www.nvidia.com", "www.amd.com", "addons.mozilla.org", "github.com"};
+    static const QStringList kRuSites{"ya.ru", "www.ozon.ru", "vk.com", "www.wildberries.ru", "www.gosuslugi.ru", "mail.ru"};
+
+    void MyServersDialog::harden(const ServerNode &s, bool fresh) {
+        if (!fresh) {
+            // the dialog must show what is on the server now (the phone may have changed it)
+            beginTask("Читаю настройки " + s.name);
+            runOn(s, {"links"}, [this](NodeRun *r, bool ok) {
+                if (!ok) return endTask(false, r->error.isEmpty() ? "Сервер не ответил" : r->error);
+                auto n = r->node;
+                syncInfo(n, r->result);
+                ServerStore::upsert(n);
+                endTask(true, "Настройки получены");
+                harden(n, true);
+            });
+            return;
+        }
+        QDialog dlg(this);
+        dlg.setWindowTitle("Защита от блокировок — " + s.name);
+        auto *lay = new QVBoxLayout(&dlg);
+        auto *hint = new QLabel("Если соединение подвисает, сайты грузятся через раз или сервер начали резать — включите нужное. "
+                                "Ключи и пользователи не меняются, профили на этом компьютере обновятся сами.");
+        hint->setWordWrap(true);
+        hint->setProperty("kombainMuted", true);
+        lay->addWidget(hint);
+        auto *box = new QFrame;
+        box->setProperty("kombainCard", true);
+        auto *form = new QFormLayout(box);
+
+        auto *af = new QCheckBox("Защита от заморозки (XHTTP)");
+        af->setChecked(s.antifreeze);
+        af->setToolTip("VLESS Encryption + Vision и не больше двух соединений — помогает, когда связь «замерзает» через 10–30 секунд");
+        form->addRow(af);
+
+        auto *fp = new QComboBox;
+        fp->addItem("Firefox", "firefox");
+        fp->addItem("Chrome", "chrome");
+        fp->addItem("Safari", "safari");
+        fp->setCurrentIndex(qMax(0, fp->findData(s.fp)));
+        form->addRow("Отпечаток браузера", fp);
+
+        auto *site = new QComboBox;
+        site->setEditable(true);
+        site->setInsertPolicy(QComboBox::NoInsert);
+        site->addItem(s.sni + " (сейчас)", s.sni);
+        for (const auto &d: s.role == "entry" ? kRuSites : kPopularSites) if (d != s.sni) site->addItem(d, d);
+        site->setCurrentIndex(0);
+        auto *find = new QPushButton("Найти рядом с сервером");
+        find->setToolTip("Сайт в той же сети, что и сервер, — маскировка выглядит естественнее всего (до минуты)");
+        auto *siteRow = new QHBoxLayout;
+        siteRow->addWidget(site, 1);
+        siteRow->addWidget(find);
+        form->addRow("Сайт для маскировки", siteRow);
+        auto dests = std::make_shared<QHash<QString, QString>>(); // domain -> ip:443 found nearby
+        auto *status = new QLabel;
+        status->setWordWrap(true);
+        status->setProperty("kombainMuted", true);
+        status->hide();
+        form->addRow(status);
+        connect(find, &QPushButton::clicked, &dlg, [this, s, site, find, dests, status] {
+            if (running) return;
+            find->setEnabled(false);
+            find->setText("Ищу…");
+            status->setText("Проверяю соседние адреса сервера — до минуты…");
+            status->show();
+            beginTask("Ищу сайты рядом с " + s.name);
+            QPointer<QComboBox> siteP(site);
+            QPointer<QPushButton> findP(find);
+            QPointer<QLabel> statusP(status);
+            runOn(s, {"find-sni", "--host", s.host.trimmed()}, [this, siteP, findP, statusP, dests](NodeRun *r, bool ok) {
+                if (!siteP || !findP || !statusP) return endTask(ok, ok ? "Поиск завершён" : r->error);
+                auto *site = siteP.data();
+                auto *find = findP.data();
+                find->setEnabled(true);
+                find->setText("Найти рядом с сервером");
+                const QString err = r->error.isEmpty() ? "Поиск не удался" : r->error;
+                if (!ok) { statusP->setText("✖ " + err); return endTask(false, err); }
+                int at = 1;
+                for (const auto &v: r->sites) {
+                    const auto o = v.toObject();
+                    const auto d = o["domain"].toString();
+                    if (d.isEmpty()) continue;
+                    (*dests)[d] = o["dest"].toString();
+                    site->insertItem(at++, QString("%1 · рядом, %2 мс").arg(d).arg(o["ms"].toInt()), d);
+                }
+                const QString msg = at > 1 ? QString("Найдено сайтов рядом: %1 — выбран самый быстрый, остальные в списке.").arg(at - 1)
+                                           : "Рядом подходящих сайтов нет — возьмите из списка популярных.";
+                statusP->setText(msg);
+                if (at > 1) site->setCurrentIndex(1);
+                endTask(true, msg);
+            });
+        });
+
+        auto *rot = new QCheckBox("Чередовать имена сайтов");
+        rot->setChecked(s.sniRotation);
+        rot->setToolTip("Разные пользователи получают разные сайты из той же сети — один заблокированный адрес не ломает всех");
+        form->addRow(rot);
+        QCheckBox *hop = nullptr;
+        if (s.protocols.split(',').contains("hy2")) {
+            hop = new QCheckBox("Прыжки портов Hysteria2");
+            hop->setChecked(!s.hyHop.isEmpty());
+            hop->setToolTip("Hysteria2 меняет UDP-порт из диапазона 1000 портов — помогает, когда провайдер душит один порт");
+            form->addRow(hop);
+        }
+        lay->addWidget(box);
+        auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        bb->button(QDialogButtonBox::Ok)->setText("Применить");
+        bb->button(QDialogButtonBox::Cancel)->setText("Отмена");
+        connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+        connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+        lay->addWidget(bb);
+        dlg.resize(560, 360);
+        if (dlg.exec() != QDialog::Accepted) return;
+        if (running) { QMessageBox::information(this, "DAK", "Дождитесь окончания текущей операции"); return; }
+
+        auto onoff = [](bool b) { return QString(b ? "on" : "off"); };
+        QStringList args{"harden", "--antifreeze", onoff(af->isChecked()), "--fp", fp->currentData().toString(),
+                         "--sni-rotation", onoff(rot->isChecked())};
+        if (hop) args << "--hop" << onoff(hop->isChecked());
+        QString domain = site->currentIndex() >= 0 && site->currentText() == site->itemText(site->currentIndex())
+                             ? site->currentData().toString() : site->currentText();
+        domain = domain.trimmed().remove("https://").remove("http://").section('/', 0, 0).section(' ', 0, 0);
+        if (!domain.isEmpty() && domain != s.sni) {
+            args << "--sni" << domain;
+            if (dests->contains(domain)) args << "--dest" << dests->value(domain);
+        }
+        beginTask("Защита от блокировок на " + s.name);
+        runOn(s, args, [this](NodeRun *r, bool ok) {
+            if (!ok) return endTask(false, r->error.isEmpty() ? "Не удалось применить" : r->error);
+            auto n = r->node;
+            syncInfo(n, r->result);
+            ServerStore::upsert(n);
+            const QString text = "Защита обновлена.";
+            if (n.role == "exit") return relinkEntry(n, r->result, text);
+            QString group = n.name;
+            if (n.role == "entry") {
+                bool f = false;
+                const auto ex = ServerStore::get(n.exitId, &f);
+                if (f) group = n.name + " → " + ex.name;
+            }
+            importLinks(n, group, r->result);
+            ServerStore::upsert(n);
+            if (n.role == "single") return relinkEntry(n, r->result, text + " Профили обновлены.");
+            endTask(true, text + " Профили обновлены.");
+        });
+    }
+
+    // A Russian VPS in front of this server: clients connect inside Russia, traffic leaves abroad.
+    void MyServersDialog::attachEntry(const ServerNode &exit) {
+        for (const auto &x: ServerStore::all()) {
+            if (x.role == "entry" && x.exitId == exit.id) {
+                QMessageBox::information(this, "DAK", QString("У «%1» уже есть вход в России — «%2».").arg(exit.name, x.name));
+                return;
+            }
+        }
+        ConnectDialog d(this);
+        d.setWindowTitle("Добавить вход в России");
+        d.hintLabel->setText(QString("Российский VPS станет входом: устройства подключаются к нему (это не режут белые списки "
+                                     "мобильных операторов), а сайты открываются через «%1». На «%1» ключи и пользователи "
+                                     "не меняются. На российский VPS поставится DAK.").arg(exit.name));
+        d.name->setPlaceholderText("Например: Москва");
+        d.goBtn->setText("Поставить");
+        if (d.exec() != QDialog::Accepted) return;
+        ServerNode entry = d.node;
+        if (entry.name.isEmpty()) entry.name = "Вход " + entry.host;
+        entry.role = "entry";
+        entry.exitId = exit.id;
+        entry.sni = "ya.ru";
+        QStringList protos;
+        for (const auto &p: exit.protocols.split(',')) if (p != "tg" && p != "sudoku" && !p.isEmpty()) protos << p;
+        entry.protocols = protos.isEmpty() ? "vless,xhttp,hy2" : protos.join(',');
+
+        beginTask(QString("Вход в России: %1 → %2").arg(entry.name, exit.name));
+        logLine("── Шаг 1 из 2: связь на " + exit.name);
+        runOn(exit, {"enable-bridge"}, [this, entry](NodeRun *r1, bool ok1) mutable {
+            const auto bridge = r1->result["bridge"].toString();
+            if (!ok1 || bridge.isEmpty()) return endTask(false, r1->error.isEmpty() ? "Не удалось подготовить сервер" : r1->error);
+            auto ex = r1->node;
+            syncInfo(ex, r1->result);
+            ServerStore::upsert(ex);
+            logLine("── Шаг 2 из 2: российский сервер " + entry.host);
+            runOn(entry, installArgs(entry, {"--role", "entry", "--exit-link", bridge}), [this, ex](NodeRun *r2, bool ok2) {
+                if (!ok2) return endTask(false, r2->error.isEmpty() ? "Российский сервер не установился" : r2->error);
+                auto en = r2->node;
+                syncInfo(en, r2->result);
+                const auto group = en.name + " → " + ex.name;
+                importLinks(en, group, r2->result);
+                ServerStore::upsert(en);
+                endTask(true, QString("Готово: профили «через Россию» — в группе «%1». Прямые профили «%2» тоже работают.").arg(group, ex.name));
+            });
         });
     }
 
     void MyServersDialog::uninstall(const ServerNode &s) {
-        if (QMessageBox::question(this, "Удалить Kombain с сервера",
-                QString("Остановить и удалить все службы Kombain на «%1»? Профили этого сервера перестанут работать.").arg(s.name)) != QMessageBox::Yes) return;
-        beginTask("Удаляю Kombain с " + s.name);
+        if (QMessageBox::question(this, "Удалить DAK с сервера",
+                QString("Остановить и удалить все службы DAK на «%1»? Профили этого сервера перестанут работать.").arg(s.name)) != QMessageBox::Yes) return;
+        beginTask("Удаляю DAK с " + s.name);
         runOn(s, {"uninstall"}, [this](NodeRun *r, bool ok) {
             if (!ok) return endTask(false, r->error.isEmpty() ? "Не удалось удалить" : r->error);
             ServerStore::remove(r->node.id);
@@ -1208,7 +1467,7 @@ namespace Kombain {
         auto btn = [&](const QString &text, const std::function<void()> &fn) {
             auto *b = new QPushButton(text);
             connect(b, &QPushButton::clicked, this, [this, fn] {
-                if (running) { QMessageBox::information(this, "Kombain", "Дождитесь окончания текущей операции"); return; }
+                if (running) { QMessageBox::information(this, "DAK", "Дождитесь окончания текущей операции"); return; }
                 fn();
             });
             row->addWidget(b);
@@ -1227,10 +1486,13 @@ namespace Kombain {
             else menu->addAction("Включить прокси для Telegram", this, [this, node] { if (!running) enableTelegram(node); });
             menu->addSeparator();
         }
+        menu->addAction("Защита от блокировок…", this, [this, node] { if (!running) harden(node); });
+        if (s.role == "single") menu->addAction("Добавить вход в России…", this, [this, node] { if (!running) attachEntry(node); });
+        menu->addSeparator();
         menu->addAction("Сменить ключи", this, [this, node] { if (!running) rotate(node, false); });
         menu->addAction("Сменить порты и ключи", this, [this, node] { if (!running) rotate(node, true); });
         menu->addSeparator();
-        menu->addAction("Удалить Kombain с сервера", this, [this, node] { if (!running) uninstall(node); });
+        menu->addAction("Удалить DAK с сервера", this, [this, node] { if (!running) uninstall(node); });
         menu->addAction("Убрать из списка (сервер не трогать)", this, [this, node] {
             ServerStore::remove(node.id);
             reloadList();
@@ -1248,7 +1510,7 @@ namespace Kombain {
         }
         const auto servers = ServerStore::all();
         if (servers.isEmpty()) {
-            auto *empty = new QLabel("Пока нет серверов, поднятых через Kombain.");
+            auto *empty = new QLabel("Пока нет серверов, поднятых через DAK.");
             empty->setProperty("kombainMuted", true);
             listLayout->addWidget(empty);
         }

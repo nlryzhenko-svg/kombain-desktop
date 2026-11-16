@@ -1192,7 +1192,7 @@ check_site() { # name host:port
   local target=${KB_REALITY_TARGET:-$2} out verify=-verify_return_error
   [ "$KB_TEST" = 1 ] && verify=""  # the test site has a self-signed certificate
   step "Проверяю сайт $1"
-  out=$(timeout 8 openssl s_client -connect "$target" -servername "$1" -tls1_3 -alpn h2 $verify </dev/null 2>/dev/null) \
+  out=$(timeout 8 openssl s_client -connect "$target" -servername "$1" -tls1_3 -alpn h2 $verify </dev/null 2>/dev/null | tr -d '\0') \
     || die "сайт $1 не отвечает по TLS 1.3 с сервера или у него неверный сертификат — выберите другой"
   echo "$out" | grep -q "ALPN protocol: h2" || die "сайт $1 не поддерживает HTTP/2 — для маскировки он не годится, выберите другой"
 }

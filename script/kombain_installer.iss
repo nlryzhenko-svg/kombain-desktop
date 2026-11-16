@@ -1,4 +1,4 @@
-; Kombain for Windows — installer (Inno Setup 6)
+; DAK for Windows — installer (Inno Setup 6)
 #ifndef AppVersion
   #define AppVersion "1.0.0"
 #endif
@@ -12,18 +12,18 @@
 
 [Setup]
 AppId={{6B1E4C2A-7D3F-4A58-9C61-2E8B0F4D7A11}
-AppName=Kombain
+AppName=DAK
 AppVersion={#AppVersion}
-AppVerName=Kombain {#AppVersion}
-AppPublisher=Kombain
+AppVerName=DAK {#AppVersion}
+AppPublisher=DAK
 VersionInfoVersion={#NumVersion}
-VersionInfoProductName=Kombain
-VersionInfoDescription=Kombain Setup
+VersionInfoProductName=DAK
+VersionInfoDescription=DAK Setup
 SourceDir=..
 OutputDir=deployment
-OutputBaseFilename=Kombain-{#AppVersion}-windows-x64-setup
+OutputBaseFilename=DAK-{#AppVersion}-windows-x64-setup
 SetupIconFile=res\Throne.ico
-UninstallDisplayName=Kombain
+UninstallDisplayName=DAK
 UninstallDisplayIcon={app}\Throne.exe
 WizardStyle=modern
 PrivilegesRequired=lowest
@@ -47,12 +47,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "deployment\windows-amd64\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; shortcuts of the version that was still called Kombain
+Type: files; Name: "{autoprograms}\Kombain.lnk"
+Type: files; Name: "{autodesktop}\Kombain.lnk"
+
 [Icons]
-Name: "{autoprograms}\Kombain"; Filename: "{app}\Throne.exe"
-Name: "{autodesktop}\Kombain"; Filename: "{app}\Throne.exe"; Tasks: desktopicon
+Name: "{autoprograms}\DAK"; Filename: "{app}\Throne.exe"
+Name: "{autodesktop}\DAK"; Filename: "{app}\Throne.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Throne.exe"; Description: "{cm:LaunchProgram,Kombain}"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\Throne.exe"; Description: "{cm:LaunchProgram,DAK}"; Flags: postinstall nowait skipifsilent
 
 [Code]
 var
@@ -97,7 +102,7 @@ begin
   begin
     StopKombain;
     DeleteUserData := SuppressibleMsgBox('Удалить также профили, настройки и список ваших серверов?' + #13#10#13#10 +
-      'Выберите «Нет», если собираетесь установить Kombain снова.', mbConfirmation, MB_YESNO, IDNO) = IDYES;
+      'Выберите «Нет», если собираетесь установить DAK снова.', mbConfirmation, MB_YESNO, IDNO) = IDYES;
   end
   else if (CurUninstallStep = usPostUninstall) and DeleteUserData then
   begin

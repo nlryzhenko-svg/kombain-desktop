@@ -178,7 +178,7 @@ Outbound: %4</translation>
     </message>
     <message>
         <source>Include Throne logs</source>
-        <translation>Добавить логи Kombain</translation>
+        <translation>Добавить логи DAK</translation>
     </message>
     <message>
         <source>Start</source>
@@ -218,7 +218,7 @@ Outbound: %4</translation>
     </message>
     <message>
         <source>Saves the Throne log of this session as one file, including the core output shown in the log panel.</source>
-        <translation>Сохраняет лог Kombain за текущий сеанс в один файл, включая вывод ядра из панели логов.</translation>
+        <translation>Сохраняет лог DAK за текущий сеанс в один файл, включая вывод ядра из панели логов.</translation>
     </message>
     <message>
         <source>Save logs…</source>
@@ -245,7 +245,7 @@ Outbound: %4</translation>
     <name>DialogAbout</name>
     <message>
         <source>About Throne</source>
-        <translation>О Kombain</translation>
+        <translation>О DAK</translation>
     </message>
     <message>
         <source>Version:</source>
@@ -257,7 +257,7 @@ Outbound: %4</translation>
     </message>
     <message>
         <source>Support Throne</source>
-        <translation>Поддержать Throne</translation>
+        <translation>Поддержать DAK</translation>
     </message>
     <message>
         <source>Unknown</source>
@@ -276,7 +276,7 @@ Outbound: %4</translation>
     </message>
     <message>
         <source>Throne %1 is available, you are using %2.</source>
-        <translation>Доступна версия Kombain %1, у вас установлена %2.</translation>
+        <translation>Доступна версия DAK %1, у вас установлена %2.</translation>
     </message>
     <message>
         <source>Release notes are unavailable.</source>
@@ -575,11 +575,11 @@ It stays a preference, not a lock: if that profile stops working the selector st
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Registers Throne as the handler for throne:// links, re-applying the registration whenever the install is moved.&lt;/p&gt;&lt;p&gt;Turning this off does not undo an existing registration: use Uninstall for that.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Регистрирует Kombain в качестве обработчика ссылок «throne://», повторно применяя регистрацию при каждом перемещении исполняемых файлов.&lt;/p&gt;&lt;p&gt;Отключение этой функции не отменяет существующую регистрацию: для этого нажмите кнопку «Удалить».&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Регистрирует DAK в качестве обработчика ссылок «throne://», повторно применяя регистрацию при каждом перемещении исполняемых файлов.&lt;/p&gt;&lt;p&gt;Отключение этой функции не отменяет существующую регистрацию: для этого нажмите кнопку «Удалить».&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the throne:// handler Throne wrote. Entries owned by other applications are left alone.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Удаляет обработчик «throne://», записанный Kombain. Записи, принадлежащие другим приложениям, остаются без изменений.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Удаляет обработчик «throne://», записанный DAK. Записи, принадлежащие другим приложениям, остаются без изменений.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When to choose Xray when importing vless profiles&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -668,7 +668,7 @@ It stays a preference, not a lock: if that profile stops working the selector st
     <message>
         <source>While Throne is running, block all traffic that does not go through Throne, including when no profile is running.
 The local network stays reachable unless Private Range Bypass is turned off in Tun Settings.</source>
-        <translation>Пока Kombain запущен, блокировать весь трафик, идущий не через Kombain, даже если ни один профиль не запущен.
+        <translation>Пока DAK запущен, блокировать весь трафик, идущий не через DAK, даже если ни один профиль не запущен.
 Локальная сеть остается доступной, если не отключен «Обход частных диапазонов» в «Настройках режима TUN».</translation>
     </message>
     <message>
@@ -681,7 +681,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>Always Start as Standard User</source>
-        <translation>Всегда запускать Kombain от имени обычного пользователя</translation>
+        <translation>Всегда запускать DAK от имени обычного пользователя</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Do not attempt to start as Admin unless explicitly requested&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -733,7 +733,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;After connecting, Throne asks an IP lookup service — through the proxy — which IP and country the connection exits from.&lt;/p&gt;&lt;p&gt;Turn this off to never contact such a service automatically.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;После подключения Kombain запрашивает у сервиса определения IP — через прокси, — с какого IP-адреса и из какой страны выходит соединение.&lt;/p&gt;&lt;p&gt;Отключите, чтобы Kombain никогда не обращался к такому сервису автоматически.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;После подключения DAK запрашивает у сервиса определения IP — через прокси, — с какого IP-адреса и из какой страны выходит соединение.&lt;/p&gt;&lt;p&gt;Отключите, чтобы DAK никогда не обращался к такому сервису автоматически.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Look up exit country</source>
@@ -765,7 +765,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Adds Throne to the &quot;Open with&quot; list for config files such as JSON and YAML, re-applying the registration whenever the install is moved.&lt;/p&gt;&lt;p&gt;Turning this off does not undo an existing registration: use Uninstall for that.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Добавляет Kombain в список «Открыть с помощью» для файлов конфигурации, таких как JSON и YAML, и повторно применяет регистрацию при каждом перемещении исполняемых файлов.&lt;/p&gt;&lt;p&gt;Отключение этой функции не отменяет существующую регистрацию: для этого нажмите кнопку «Удалить».&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Добавляет DAK в список «Открыть с помощью» для файлов конфигурации, таких как JSON и YAML, и повторно применяет регистрацию при каждом перемещении исполняемых файлов.&lt;/p&gt;&lt;p&gt;Отключение этой функции не отменяет существующую регистрацию: для этого нажмите кнопку «Удалить».&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Register config files at startup</source>
@@ -777,7 +777,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes every config file association Throne wrote, including those added by older versions. Associations owned by other applications are left alone.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Удаляет все ассоциации конфигурационных файлов, созданные Kombain, включая те, что были добавлены более старыми версиями. Ассоциации, принадлежащие другим приложениям, остаются без изменений.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Удаляет все ассоциации конфигурационных файлов, созданные DAK, включая те, что были добавлены более старыми версиями. Ассоциации, принадлежащие другим приложениям, остаются без изменений.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Logging</source>
@@ -849,7 +849,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>Follow the connection status icon in the dock/taskbar. When off, it always shows the Throne icon</source>
-        <translation>Показывать иконку статуса подключения в доке/на панели задач. Если выключено, там всегда отображается иконка Kombain</translation>
+        <translation>Показывать иконку статуса подключения в доке/на панели задач. Если выключено, там всегда отображается иконка DAK</translation>
     </message>
     <message>
         <source>Follow Status Icon in Taskbar</source>
@@ -1098,9 +1098,9 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     <message numerus="yes">
         <source>Skipped %n routing rule(s) that use conditions this version of Throne does not support.</source>
         <translation>
-            <numerusform>Пропущено %n правило маршрутизации, которое использует условия, не поддерживаемые данной версией Throne.</numerusform>
-            <numerusform>Пропущено %n правила маршрутизации, которые используют условия, не поддерживаемые данной версией Throne.</numerusform>
-            <numerusform>Пропущено %n правил маршрутизации, которые используют условия, не поддерживаемые данной версией Throne.</numerusform>
+            <numerusform>Пропущено %n правило маршрутизации, которое использует условия, не поддерживаемые данной версией DAK.</numerusform>
+            <numerusform>Пропущено %n правила маршрутизации, которые используют условия, не поддерживаемые данной версией DAK.</numerusform>
+            <numerusform>Пропущено %n правил маршрутизации, которые используют условия, не поддерживаемые данной версией DAK.</numerusform>
         </translation>
     </message>
     <message>
@@ -1125,7 +1125,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>Throne Backup (*.thrbackup)</source>
-        <translation>Резервная копия Kombain (*.thrbackup)</translation>
+        <translation>Резервная копия DAK (*.thrbackup)</translation>
     </message>
     <message>
         <source>Select at least one part to include in the backup.</source>
@@ -1133,7 +1133,7 @@ The local network stays reachable unless Private Range Bypass is turned off in T
     </message>
     <message>
         <source>Backup restored successfully. Throne will now restart for the changes to take effect.</source>
-        <translation>Резервная копия успешно восстановлена. Kombain будет перезапущен для применения изменений.</translation>
+        <translation>Резервная копия успешно восстановлена. DAK будет перезапущен для применения изменений.</translation>
     </message>
     <message>
         <source>Backup created on %1.
@@ -1273,7 +1273,7 @@ Included: %2</source>
     </message>
     <message>
         <source>Not a valid Throne backup file.</source>
-        <translation>Файл не является резервной копией Kombain.</translation>
+        <translation>Файл не является резервной копией DAK.</translation>
     </message>
     <message>
         <source>Unsupported backup format version: %1.
@@ -1289,7 +1289,7 @@ This backup may have been created with a newer version of the application.</sour
         <source>Each selected part replaces the current data. This cannot be undone.
 Throne will restart to complete the restore.</source>
         <translation>Каждый выбранный раздел заменит текущие данные. Это действие нельзя отменить.
-Для завершения восстановления Kombain перезапустится.</translation>
+Для завершения восстановления DAK перезапустится.</translation>
     </message>
     <message>
         <source>Select at least one part to restore.</source>
@@ -3038,7 +3038,7 @@ Throne will restart to complete the restore.</source>
     </message>
     <message>
         <source>Scripts connect with thronectl or the Throne API library.</source>
-        <translation>Скрипты подключаются через thronectl или библиотеку Throne API.</translation>
+        <translation>Скрипты подключаются через thronectl или библиотеку DAK API.</translation>
     </message>
     <message>
         <source>Hide</source>
@@ -3102,11 +3102,11 @@ Throne will restart to complete the restore.</source>
     </message>
     <message>
         <source>Throne API</source>
-        <translation>Throne API</translation>
+        <translation>DAK API</translation>
     </message>
     <message>
         <source>Enable the Throne API</source>
-        <translation>Включить Throne API</translation>
+        <translation>Включить DAK API</translation>
     </message>
     <message>
         <source>Listen on</source>
@@ -3134,7 +3134,7 @@ Throne will restart to complete the restore.</source>
     </message>
     <message>
         <source>Lets devices on the local network import, delete, change settings, back up and restore through the Throne API. This device can always do so.</source>
-        <translation>Позволяет устройствам в локальной сети импортировать, удалять, менять настройки, создавать резервные копии и восстанавливать их через Throne API. Это устройство может делать это всегда.</translation>
+        <translation>Позволяет устройствам в локальной сети импортировать, удалять, менять настройки, создавать резервные копии и восстанавливать их через DAK API. Это устройство может делать это всегда.</translation>
     </message>
     <message>
         <source>Allow management from the local network</source>
@@ -3166,7 +3166,7 @@ Throne will restart to complete the restore.</source>
     </message>
     <message>
         <source>Devices on your network can control Throne with this key. Your firewall may ask to allow Throne.</source>
-        <translation>Устройства в вашей сети смогут управлять Kombain с помощью этого ключа. Брандмауэр может запросить разрешение для Kombain.</translation>
+        <translation>Устройства в вашей сети смогут управлять DAK с помощью этого ключа. Брандмауэр может запросить разрешение для DAK.</translation>
     </message>
     <message>
         <source>Shortcuts</source>
@@ -3851,7 +3851,7 @@ A domain listed with only one address family is answered NXDOMAIN for the other,
     </message>
     <message>
         <source>Paste a Throne route link, a remoteRoute link, a base64 blob, or a JSON rule array</source>
-        <translation>Вставьте ссылку маршрута Kombain, ссылку remoteRoute, base64 или массив правил JSON</translation>
+        <translation>Вставьте ссылку маршрута DAK, ссылку remoteRoute, base64 или массив правил JSON</translation>
     </message>
     <message>
         <source>Add remote routing profiles</source>
@@ -5291,7 +5291,7 @@ Close without saving?</source>
     </message>
     <message>
         <source>This server requires single sign-on in a browser, which Throne does not support yet. Cancel here and use a profile with direct credentials, or supply an authentication cookie in the profile&apos;s advanced settings.</source>
-        <translation>Этот сервер требует единого входа (SSO) через браузер, а Kombain его пока не поддерживает. Отмените запрос и используйте профиль с обычными учетными данными или укажите cookie аутентификации в доп. настройках профиля.</translation>
+        <translation>Этот сервер требует единого входа (SSO) через браузер, а DAK его пока не поддерживает. Отмените запрос и используйте профиль с обычными учетными данными или укажите cookie аутентификации в доп. настройках профиля.</translation>
     </message>
     <message>
         <source>Unsupported authentication request: %1</source>
@@ -6162,7 +6162,7 @@ Leave some out: ^(?!.*(germany|🇩🇪)).*$ uses every name that contains neith
     </message>
     <message>
         <source>Xray full config (Throne adds a socks inbound and uses sing-box for tun/routing).</source>
-        <translation>Полная конфигурация Xray (Kombain добавляет socks inbound и использует sing-box для tun / маршрутизации).</translation>
+        <translation>Полная конфигурация Xray (DAK добавляет socks inbound и использует sing-box для tun / маршрутизации).</translation>
     </message>
     <message>
         <source>Please fill the complete config.</source>
@@ -7017,7 +7017,7 @@ Improves hole-punching reliability. Requires IPv4.</source>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This is the token the core generates itself. To use a Throne OTP profile, bind it on the main editor instead.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Это токен, который генерирует само ядро. Чтобы использовать OTP-профиль Kombain, привяжите его в основном редакторе.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Это токен, который генерирует само ядро. Чтобы использовать OTP-профиль DAK, привяжите его в основном редакторе.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Software Token</source>
@@ -7500,7 +7500,7 @@ Improves hole-punching reliability. Requires IPv4.</source>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Static challenge text shown by the server when it asks for a second authentication response. When a challenge is set and an OTP profile is bound, Throne sends the answer itself and no interactive prompt appears.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Текст статического запроса, который сервер показывает, когда запрашивает второй ответ для аутентификации. Если запрос задан и привязан OTP-профиль, Kombain отправляет ответ сам и окно запроса не появляется.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Текст статического запроса, который сервер показывает, когда запрашивает второй ответ для аутентификации. Если запрос задан и привязан OTP-профиль, DAK отправляет ответ сам и окно запроса не появляется.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Static Challenge</source>
@@ -8820,14 +8820,14 @@ Improves hole-punching reliability. Requires IPv4.</source>
     <name>Engine::ConnectionManager</name>
     <message>
         <source>A background Throne (PID %1) owns Tun on this computer; stop it or use thronectl.</source>
-        <translation>Tun на этом компьютере занят фоновым Kombain (PID %1); остановите его или используйте thronectl.</translation>
+        <translation>Tun на этом компьютере занят фоновым DAK (PID %1); остановите его или используйте thronectl.</translation>
     </message>
 </context>
 <context>
     <name>Engine::CoreSupervisor</name>
     <message>
         <source>Throne could not open the local channel the core connects to (%1), so no profile can start.</source>
-        <translation>Kombain не удалось открыть локальный канал, через который подключается ядро (%1), поэтому ни один профиль не может быть запущен.</translation>
+        <translation>DAK не удалось открыть локальный канал, через который подключается ядро (%1), поэтому ни один профиль не может быть запущен.</translation>
     </message>
     <message>
         <source>Core unavailable</source>
@@ -8924,11 +8924,11 @@ Improves hole-punching reliability. Requires IPv4.</source>
     <name>GuiStartup</name>
     <message>
         <source>Throne is running in the background</source>
-        <translation>Kombain работает в фоновом режиме</translation>
+        <translation>DAK работает в фоновом режиме</translation>
     </message>
     <message>
         <source>A background Throne (PID %1) is running on this computer (data directory: %2). Tun mode is unavailable here while it runs; stop it or use thronectl.</source>
-        <translation>На этом компьютере работает фоновый Kombain (PID %1, каталог данных: %2). Пока он работает, режим Tun здесь недоступен; остановите его или используйте thronectl.</translation>
+        <translation>На этом компьютере работает фоновый DAK (PID %1, каталог данных: %2). Пока он работает, режим Tun здесь недоступен; остановите его или используйте thronectl.</translation>
     </message>
 </context>
 <context>
@@ -9994,7 +9994,7 @@ Error: %1</source>
     </message>
     <message>
         <source>Restart as administrator was cancelled, Throne keeps running</source>
-        <translation>Перезапуск от имени администратора отменен, Kombain продолжает работу</translation>
+        <translation>Перезапуск от имени администратора отменен, DAK продолжает работу</translation>
     </message>
     <message>
         <source>This installation cannot grant the core privileges by itself.</source>
@@ -10042,7 +10042,7 @@ Error: %1</source>
     </message>
     <message>
         <source>Turn off the kill switch? Traffic that does not go through Throne will no longer be blocked.</source>
-        <translation>Отключить kill switch? Трафик, идущий не через Kombain, больше не будет блокироваться.</translation>
+        <translation>Отключить kill switch? Трафик, идущий не через DAK, больше не будет блокироваться.</translation>
     </message>
     <message>
         <source>[Kill switch] Restarting the core so that its own traffic passes the kill switch...</source>
@@ -10210,7 +10210,7 @@ Please try again.</source>
     </message>
     <message>
         <source>Please run Throne as admin</source>
-        <translation>Пожалуйста, запустите Kombain от имени администратора</translation>
+        <translation>Пожалуйста, запустите DAK от имени администратора</translation>
     </message>
     <message>
         <source>Add profile from File(s)</source>
@@ -10546,7 +10546,7 @@ Name: %1</source>
     </message>
     <message>
         <source>Update is unavailable while a background Throne (PID %1) runs from this installation; stop it first.</source>
-        <translation>Обновление недоступно, пока из этой установки работает фоновый Kombain (PID %1); сначала остановите его.</translation>
+        <translation>Обновление недоступно, пока из этой установки работает фоновый DAK (PID %1); сначала остановите его.</translation>
     </message>
     <message>
         <source>Kill switch is blocking traffic</source>
@@ -10887,7 +10887,7 @@ Windows then ignores the adapter binding that keeps Throne&apos;s own connection
 To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&quot; (Settings &gt; Mobile hotspot &gt; Share my internet connection from), or turn the hotspot off while using Tun mode.</source>
         <translation>Для сетевого адаптера &quot;%1&quot; включена пересылка IPv4 — обычно потому, что через него раздаёт интернет мобильный хот-спот или общий доступ к подключению к Интернету (ICS).
 
-В этом случае Windows игнорирует привязку к адаптеру, которая не пускает собственные подключения Kombain в TUN, поэтому они зацикливаются обратно в него и не работают.
+В этом случае Windows игнорирует привязку к адаптеру, которая не пускает собственные подключения DAK в TUN, поэтому они зацикливаются обратно в него и не работают.
 
 Чтобы это исправить, раздавайте хот-спот с адаптера throne-tun вместо &quot;%1&quot; (Параметры &gt; Мобильный хот-спот &gt; Совместное использование подключения к Интернету) или отключайте хот-спот на время работы в режиме TUN.</translation>
     </message>
@@ -11179,19 +11179,19 @@ To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&q
     </message>
     <message>
         <source>Throne is running in the background (PID %1). Stop the service or use thronectl.</source>
-        <translation>Kombain работает в фоновом режиме (PID %1). Остановите службу или используйте thronectl.</translation>
+        <translation>DAK работает в фоновом режиме (PID %1). Остановите службу или используйте thronectl.</translation>
     </message>
     <message>
         <source>Throne is running in the background. Stop the service or use thronectl.</source>
-        <translation>Kombain работает в фоновом режиме. Остановите службу или используйте thronectl.</translation>
+        <translation>DAK работает в фоновом режиме. Остановите службу или используйте thronectl.</translation>
     </message>
     <message>
         <source>Another Throne instance (PID %1)</source>
-        <translation>Другой экземпляр Kombain (PID %1)</translation>
+        <translation>Другой экземпляр DAK (PID %1)</translation>
     </message>
     <message>
         <source>Another Throne instance</source>
-        <translation>Другой экземпляр Kombain</translation>
+        <translation>Другой экземпляр DAK</translation>
     </message>
     <message>
         <source>%1 is using this data directory:
@@ -11201,7 +11201,7 @@ To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&q
     </message>
     <message>
         <source>[Warn] Throne did not shut down cleanly last time. Diagnostics were saved to: %1</source>
-        <translation>[Предупреждение] В прошлый раз Kombain не завершил работу корректно. Результаты диагностики сохранены в: %1</translation>
+        <translation>[Предупреждение] В прошлый раз DAK не завершил работу корректно. Результаты диагностики сохранены в: %1</translation>
     </message>
     <message>
         <source>a profile that no longer exists</source>
@@ -11733,7 +11733,7 @@ To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&q
     </message>
     <message>
         <source>Configure a proxy through Throne&apos;s chain instead, ignored: %1</source>
-        <translation>Вместо этого настройте прокси через цепочку Kombain; проигнорировано: %1</translation>
+        <translation>Вместо этого настройте прокси через цепочку DAK; проигнорировано: %1</translation>
     </message>
     <message>
         <source>Unknown OpenConnect option, ignored: %1</source>
@@ -11833,11 +11833,11 @@ To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&q
     </message>
     <message>
         <source>The statistics database is unusable (%1). Statistics are paused for this session and the file will be rebuilt when Throne restarts.</source>
-        <translation>База данных статистики непригодна для использования (%1). Сбор статистики приостановлен на этот сеанс, а файл будет пересоздан при перезапуске Kombain.</translation>
+        <translation>База данных статистики непригодна для использования (%1). Сбор статистики приостановлен на этот сеанс, а файл будет пересоздан при перезапуске DAK.</translation>
     </message>
     <message>
         <source>Writing statistics keeps failing (%1). Statistics are paused until Throne restarts.</source>
-        <translation>Запись статистики постоянно завершается ошибкой (%1). Сбор статистики приостановлен до перезапуска Kombain.</translation>
+        <translation>Запись статистики постоянно завершается ошибкой (%1). Сбор статистики приостановлен до перезапуска DAK.</translation>
     </message>
     <message>
         <source>Empty</source>
@@ -12005,7 +12005,7 @@ To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&q
     </message>
     <message>
         <source>Throne needs at least one group.</source>
-        <translation>Kombain нужна хотя бы одна группа.</translation>
+        <translation>DAK нужна хотя бы одна группа.</translation>
     </message>
     <message>
         <source>This group&apos;s subscription is being updated. Try again when it finishes.</source>
@@ -12201,8 +12201,8 @@ To fix this, share the hotspot from the throne-tun adapter instead of &quot;%1&q
 Throne will NOT add its DNS-hijack or xray bridge plumbing, so DNS, chained/xray
 outbounds and other Throne features may break. For advanced users only.</source>
         <translation>Использовать объект route точно в том виде, как он написан (ID outbound по-прежнему преобразуются в теги).
-Kombain НЕ будет добавлять свой перехват DNS (DNS-hijack) и мост xray, поэтому DNS, цепочки/xray
-outbound и другие функции Kombain могут не работать. Только для опытных пользователей.</translation>
+DAK НЕ будет добавлять свой перехват DNS (DNS-hijack) и мост xray, поэтому DNS, цепочки/xray
+outbound и другие функции DAK могут не работать. Только для опытных пользователей.</translation>
     </message>
     <message>
         <source>Format JSON</source>
@@ -12359,7 +12359,7 @@ outbound и другие функции Kombain могут не работать
     </message>
     <message>
         <source>Throne is shutting down</source>
-        <translation>Kombain завершает работу</translation>
+        <translation>DAK завершает работу</translation>
     </message>
 </context>
 <context>
@@ -13294,7 +13294,7 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
     <message>
         <source>Kill switch: on — traffic only flows through Throne&apos;s Tun</source>
-        <translation>Kill switch: включен — трафик идет только через TUN Kombain</translation>
+        <translation>Kill switch: включен — трафик идет только через TUN DAK</translation>
     </message>
     <message>
         <source>Kill switch is not active</source>
@@ -13427,7 +13427,7 @@ Remove that endpoint from this routing profile as well?</source>
     <name>Sys::KillSwitch</name>
     <message>
         <source>The kill switch needs Throne to run as administrator.</source>
-        <translation>Для kill switch нужно запустить Kombain от имени администратора.</translation>
+        <translation>Для kill switch нужно запустить DAK от имени администратора.</translation>
     </message>
     <message>
         <source>The kill switch needs the core to have root privileges.</source>
@@ -13467,7 +13467,7 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
     <message>
         <source>[Kill switch] On: only traffic through Throne can leave this device.</source>
-        <translation>[Kill switch] Включен: покинуть это устройство может только трафик через Kombain.</translation>
+        <translation>[Kill switch] Включен: покинуть это устройство может только трафик через DAK.</translation>
     </message>
     <message>
         <source>[Kill switch] New settings applied.</source>
@@ -13834,7 +13834,7 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
     <message>
         <source>Throne does not support the Xray transport &quot;%1&quot;. Use raw, xhttp, ws, httpupgrade, grpc, kcp or xdrive.</source>
-        <translation>Kombain не поддерживает транспорт Xray &quot;%1&quot;. Используйте raw, xhttp, ws, httpupgrade, grpc, kcp или xdrive.</translation>
+        <translation>DAK не поддерживает транспорт Xray &quot;%1&quot;. Используйте raw, xhttp, ws, httpupgrade, grpc, kcp или xdrive.</translation>
     </message>
     <message>
         <source>Xray does not support the security &quot;%1&quot;. Use none, tls or reality.</source>
@@ -14038,19 +14038,19 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
     <message>
         <source>Removed the V2Ray API from the imported configuration: Throne&apos;s core is built without it and would not start, and it would open a statistics port on this computer.</source>
-        <translation>V2Ray API удален из импортированной конфигурации: ядро Kombain собрано без него и не запустилось бы, а также он открыл бы на этом компьютере порт статистики.</translation>
+        <translation>V2Ray API удален из импортированной конфигурации: ядро DAK собрано без него и не запустилось бы, а также он открыл бы на этом компьютере порт статистики.</translation>
     </message>
     <message>
         <source>Removed the inbounds from the imported configuration: Throne adds its own local inbound, and these could let other devices connect through this computer.</source>
-        <translation>Inbound удалены из импортированной конфигурации: Kombain добавляет собственный локальный inbound, а эти могли бы позволить другим устройствам подключаться через этот компьютер.</translation>
+        <translation>Inbound удалены из импортированной конфигурации: DAK добавляет собственный локальный inbound, а эти могли бы позволить другим устройствам подключаться через этот компьютер.</translation>
     </message>
     <message>
         <source>Removed the environment variables from the imported configuration: they would apply to Throne&apos;s core and to the programs it starts.</source>
-        <translation>Переменные окружения удалены из импортированной конфигурации: они применялись бы к ядру Kombain и запускаемым им программам.</translation>
+        <translation>Переменные окружения удалены из импортированной конфигурации: они применялись бы к ядру DAK и запускаемым им программам.</translation>
     </message>
     <message>
         <source>Removed the geodata updater from the imported configuration: it would download files from addresses the sender chose and replace files in Throne&apos;s folder.</source>
-        <translation>Обновление геоданных удалено из импортированной конфигурации: оно загружало бы файлы с адресов, выбранных отправителем, и заменяло файлы в папке Kombain.</translation>
+        <translation>Обновление геоданных удалено из импортированной конфигурации: оно загружало бы файлы с адресов, выбранных отправителем, и заменяло файлы в папке DAK.</translation>
     </message>
     <message>
         <source>Removed the webhook from this routing rule: it would send the details of every matching connection to an address the sender chose.</source>
@@ -14666,7 +14666,7 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
     <message>
         <source>Ignored; Throne sends all traffic of this profile through the tunnel.</source>
-        <translation>Игнорируется; Kombain направляет весь трафик этого профиля через туннель.</translation>
+        <translation>Игнорируется; DAK направляет весь трафик этого профиля через туннель.</translation>
     </message>
     <message>
         <source>The [Peer] section has no Endpoint such as vpn.example.com:51820.</source>
@@ -14870,11 +14870,11 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
     <message>
         <source>Rename this key to &quot;%1&quot;: Throne reads only that spelling, and dropping its value would weaken the connection&apos;s security.</source>
-        <translation>Переименуйте этот ключ в &quot;%1&quot;: Kombain понимает только такое написание, а отбрасывание его значения ослабило бы безопасность соединения.</translation>
+        <translation>Переименуйте этот ключ в &quot;%1&quot;: DAK понимает только такое написание, а отбрасывание его значения ослабило бы безопасность соединения.</translation>
     </message>
     <message>
         <source>Rename this key to &quot;%1&quot;: Throne reads only that spelling, so its value was ignored.</source>
-        <translation>Переименуйте этот ключ в &quot;%1&quot;: Kombain понимает только такое написание, поэтому его значение проигнорировано.</translation>
+        <translation>Переименуйте этот ключ в &quot;%1&quot;: DAK понимает только такое написание, поэтому его значение проигнорировано.</translation>
     </message>
     <message>
         <source>Could not be parsed.</source>

@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QList>
 #include <QObject>
 #include <QProcess>
@@ -28,6 +29,9 @@ namespace Kombain {
         QString stats; // last `stats` JSON
         qint64 statsAt = 0;
         QString health;
+        // protection settings, as the server reported them (info)
+        QString fp = "firefox", hyHop;
+        bool antifreeze = false, sniRotation = false;
 
         QJsonObject toJson() const;
         static ServerNode fromJson(const QJsonObject &o);
@@ -53,6 +57,7 @@ namespace Kombain {
         ServerNode node;
         QJsonObject result; // KB_RESULT
         QJsonObject stats;  // KB_STATS
+        QJsonArray sites;   // KB_SNI (find-sni)
         QString error;
 
     signals:
@@ -98,6 +103,9 @@ namespace Kombain {
         void addUser(const ServerNode &s);
         void rotate(const ServerNode &s, bool askPorts);
         void uninstall(const ServerNode &s);
+        void harden(const ServerNode &s, bool fresh = false);
+        void attachEntry(const ServerNode &exit);
+        void relinkEntry(const ServerNode &exit, const QJsonObject &result, const QString &okText);
         void enableTelegram(const ServerNode &s);
         void disableTelegram(const ServerNode &s);
         void importLinks(ServerNode &node, const QString &groupName, const QJsonObject &result, bool firstUserOnly = true);
