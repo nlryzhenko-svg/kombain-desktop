@@ -31,7 +31,7 @@ VPN-клиент для компьютера: VLESS Reality, XHTTP, Hysteria2, T
 
 ## Сборка
 
-Сборка идёт в GitHub Actions (`.github/workflows/kombain-windows.yml`) при каждом пуше в `main`. Готовые файлы лежат в артефактах запуска. Тег вида `v1.2.3` создаёт релиз с установщиком.
+Сборка идёт в GitHub Actions (`.github/workflows/kombain-windows.yml`) при каждом пуше в `main`. Готовые файлы лежат в артефактах запуска. Релиз с установщиком создаётся тегом `v1.2.3` или версией в файле `.github/RELEASE` (например `1.0.1`) при пуше в `main`.
 
 ## Лицензия и авторы
 
